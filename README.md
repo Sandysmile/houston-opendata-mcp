@@ -51,8 +51,9 @@ start. API usage is billed separately from a Claude plan.
 ## Host it
 
 See **[deploy/streamlit/README.md](deploy/streamlit/README.md)**. One process serves
-the Streamlit page at `/` and MCP at `/api/mcp`. The template's IBM, Databricks, and
-cloud.gov kits in [deploy/](deploy/README.md) also still work, and serve MCP alone at `/mcp`.
+the Streamlit page at `/` and MCP at `/api/mcp`. Streamlit Community Cloud may block
+outside MCP clients, so test it with `scripts/smoke_test.py`. The template's IBM and
+Databricks kits are in [deploy/](deploy/README.md), but they haven't been tested with this server.
 
 ## Repo layout
 
