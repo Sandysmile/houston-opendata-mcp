@@ -19,6 +19,12 @@ as a **Dataset Access Server**. It is read-only, and it needs no key or sign-in.
 | `houston_list_organizations` | List departments and their dataset counts |
 | `houston_list_groups` | List topic groups and their dataset counts |
 
+With `USE_ARCGIS=true`, the server adds a seventh tool:
+
+| Tool | What it does |
+|---|---|
+| `houston_lookup_address` | Find an address's city limits, council district, and super neighborhood, using City GIS layers on ArcGIS Online |
+
 The server also offers two prompts (`explore_houston_topic`, `compare_by_geography`)
 and two resources (`houston://info/server`, `houston://docs/join-keys`).
 
@@ -48,6 +54,19 @@ It needs `ANTHROPIC_API_KEY` and `APP_PASSWORD`, set as Streamlit secrets or loc
 `.streamlit/secrets.toml`, which Git ignores. Copy `.streamlit/secrets.toml.example` to
 start. API usage is billed separately from a Claude plan.
 
+## Ask Houston and Ask Houston+
+
+One codebase runs as two apps, so the only difference between them is the data:
+
+| App | `USE_ARCGIS` | Data sources |
+|---|---|---|
+| **Ask Houston** | `"false"` (default) | Open Data Portal |
+| **Ask Houston+** | `"true"` | Open Data Portal + City GIS address lookup |
+
+Set `USE_ARCGIS` in each Streamlit app's secrets. The City GIS layers are fixed in
+`src/houston_opendata/gis.py`: site addresses, city limits, council districts, and
+super neighborhoods. Both apps also give the agent today's date in Houston time.
+
 ## Host it
 
 See **[deploy/streamlit/README.md](deploy/streamlit/README.md)**. One process serves
@@ -64,6 +83,7 @@ main.py                     # Local stdio entry point
 src/houston_opendata/
 ├── app.py                  # Builds FastMCP, picks the transport
 ├── portal.py               # Read-only CKAN client, shared by the tools and the page
+├── gis.py                  # Read-only City GIS client for Ask Houston+
 ├── page.py                 # Streamlit page
 ├── config.py, models.py, utils.py, routes.py
 ├── tools/                  # One file per tool
