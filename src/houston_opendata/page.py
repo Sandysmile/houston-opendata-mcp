@@ -19,6 +19,7 @@ MAX_QUESTIONS = 10
 HISTORY_MESSAGES = 7  # Odd, so the window always starts with a question.
 EXAMPLES = "Try: Which datasets cover council districts?"
 PLUS_EXAMPLES = "Try: I just moved to 901 Bagby St. Who represents me?"
+GIS_HUB_URL = "https://houston-mycity.opendata.arcgis.com"
 
 TOOLS = [
     ("houston_search_datasets", "Search the catalog by keyword, department, or topic"),
@@ -139,7 +140,7 @@ st.caption(f"Houston Open Data MCP · {SOURCES}")
 st.write(
     "Lets an AI assistant search and read public data from the "
     f"[City of Houston Open Data portal]({settings.portal_url})"
-    + (" and City GIS data sources" if USE_ARCGIS else "")
+    + (f" and [selected City GIS data sources]({GIS_HUB_URL})" if USE_ARCGIS else "")
     + ". It only reads data, and it needs no sign-in."
 )
 st.caption("Hackathon prototype. Not an official City of Houston service.")
