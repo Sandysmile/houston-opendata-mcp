@@ -36,5 +36,11 @@ class Settings(BaseSettings):
     # ── Chat agent ────────────────────────────────────────────────────────────
     agent_model: str = "claude-sonnet-5-5"
 
+    # ── City GIS (Ask Houston+) ───────────────────────────────────────────────
+    # Off: "Ask Houston", the open data portal only.
+    # On (USE_ARCGIS=true): "Ask Houston+", which adds an address lookup against
+    # the City's ArcGIS Online layers. The layers themselves are fixed in gis.py.
+    use_arcgis: bool = False
+
 
 settings = Settings()

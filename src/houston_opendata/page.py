@@ -18,6 +18,7 @@ from houston_opendata.config import settings  # noqa: E402
 MAX_QUESTIONS = 10
 HISTORY_MESSAGES = 7  # Odd, so the window always starts with a question.
 EXAMPLES = "Try: Which datasets cover council districts?"
+PLUS_EXAMPLES = "Try: I just moved to 901 Bagby St. Who represents me?"
 
 TOOLS = [
     ("houston_search_datasets", "Search the catalog by keyword, department, or topic"),
@@ -26,6 +27,12 @@ TOOLS = [
     ("houston_query_records", "Read rows with filters, sorting, and paging"),
     ("houston_list_organizations", "List departments and their dataset counts"),
     ("houston_list_groups", "List topic groups and their dataset counts"),
+]
+PLUS_TOOLS = [
+    (
+        "houston_lookup_address",
+        "Find an address's city limits, council district, and super neighborhood",
+    ),
 ]
 
 
@@ -56,6 +63,11 @@ def secret(name: str) -> str:
         return ""
     except Exception:  # noqa: BLE001 - treat unreadable secrets as not configured
         return ""
+
+
+def arcgis_on() -> bool:
+    """Ask Houston+ when USE_ARCGIS is true in the secrets or the environment."""
+    return settings.use_arcgis or secret("USE_ARCGIS").strip().lower() == "true"
 
 
 def unlocked(password: str) -> bool:
@@ -94,7 +106,7 @@ def render_chat() -> None:
 
     question = st.chat_input("Ask about Houston open data")
     if not history and not question:
-        st.caption(EXAMPLES)
+        st.caption(PLUS_EXAMPLES if USE_ARCGIS else EXAMPLES)
     if not question:
         return
 
@@ -102,7 +114,11 @@ def render_chat() -> None:
     show_message("user", question)
     try:
         with st.spinner("Checking the portal…"):
-            answer = agent.ask(agent.make_client(api_key), history[-HISTORY_MESSAGES:])
+            answer = agent.ask(
+                agent.make_client(api_key),
+                history[-HISTORY_MESSAGES:],
+                use_arcgis=USE_ARCGIS,
+            )
     except Exception as exc:  # noqa: BLE001 - show a safe message, never the key
         history.pop()
         st.error(f"The assistant couldn't answer ({type(exc).__name__}). Try again.")
@@ -111,9 +127,14 @@ def render_chat() -> None:
     show_message("assistant", answer)
 
 
-st.set_page_config(page_title="Houston Open Data MCP", layout="centered")
+USE_ARCGIS = arcgis_on()
+APP_NAME = "Ask Houston+" if USE_ARCGIS else "Ask Houston"
+SOURCES = "Open Data Portal + City GIS" if USE_ARCGIS else "Open Data Portal"
 
-st.title("Houston Open Data MCP")
+st.set_page_config(page_title=APP_NAME, layout="centered")
+
+st.title(APP_NAME)
+st.caption(f"Houston Open Data MCP · {SOURCES}")
 st.write(
     "Lets an AI assistant search and read public data from the "
     f"[City of Houston Open Data portal]({settings.portal_url}). "
@@ -132,7 +153,11 @@ with connect:
     st.write("Add this address as a remote MCP server in your AI client.")
     st.subheader("Tools")
     st.dataframe(
-        pd.DataFrame(TOOLS, columns=["Tool", "What it does"]),
+        # The MCP endpoint registers its tools at startup from the environment.
+        pd.DataFrame(
+            TOOLS + (PLUS_TOOLS if settings.use_arcgis else []),
+            columns=["Tool", "What it does"],
+        ),
         hide_index=True,
         width="stretch",
     )
