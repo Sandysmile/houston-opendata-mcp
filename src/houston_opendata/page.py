@@ -67,7 +67,8 @@ def secret(name: str) -> str:
 
 def arcgis_on() -> bool:
     """Ask Houston+ when USE_ARCGIS is true in the secrets or the environment."""
-    return settings.use_arcgis or secret("USE_ARCGIS").strip().lower() == "true"
+    from_env = getattr(settings, "use_arcgis", False)  # safe if config is stale
+    return from_env or secret("USE_ARCGIS").strip().lower() == "true"
 
 
 def unlocked(password: str) -> bool:
@@ -137,8 +138,9 @@ st.title(APP_NAME)
 st.caption(f"Houston Open Data MCP · {SOURCES}")
 st.write(
     "Lets an AI assistant search and read public data from the "
-    f"[City of Houston Open Data portal]({settings.portal_url}). "
-    "It only reads data, and it needs no sign-in."
+    f"[City of Houston Open Data portal]({settings.portal_url})"
+    + (" and City GIS data sources" if USE_ARCGIS else "")
+    + ". It only reads data, and it needs no sign-in."
 )
 st.caption("Hackathon prototype. Not an official City of Houston service.")
 
@@ -155,7 +157,7 @@ with connect:
     st.dataframe(
         # The MCP endpoint registers its tools at startup from the environment.
         pd.DataFrame(
-            TOOLS + (PLUS_TOOLS if settings.use_arcgis else []),
+            TOOLS + (PLUS_TOOLS if getattr(settings, "use_arcgis", False) else []),
             columns=["Tool", "What it does"],
         ),
         hide_index=True,
