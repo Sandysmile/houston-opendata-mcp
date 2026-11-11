@@ -6,7 +6,11 @@ An MCP server that lets an AI assistant search and read public data from the
 Built from the [GSA MCP hackathon template](https://github.com/GSA-TTS/mcp-hackathon-template)
 as a **Dataset Access Server**. It is read-only, and it needs no key or sign-in.
 
-> Hackathon prototype. Not an official City of Houston service.
+> **Disclaimer**
+> Hackathon prototype built on the [City of Houston's public open data portal](https://data.houstontx.gov).
+> This is an independent project and **not an official City of Houston service**.
+> Answers reflect published datasets and may be incomplete or out of date — verify
+> anything important against the source dataset.
 
 ## Tools
 
