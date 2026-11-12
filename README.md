@@ -12,6 +12,18 @@ as a **Dataset Access Server**. It is read-only, and it needs no key or sign-in.
 > Answers reflect published datasets and may be incomplete or out of date — verify
 > anything important against the source dataset.
 
+## Why it matters
+
+People already ask AI about city services. This project tests whether AI can actually
+use Houston's open data to answer them. With the same AI and the same question, the
+answer goes from generic (no MCP), to grounded in City datasets (Ask Houston), to
+specific to your address (Ask Houston+).
+
+**Evaluation (November 2026):** 6 of 6 known-answer questions correct, including one
+the portal can't answer; 30 live tool calls with 0 errors and a median of about
+0.2 seconds; 52 unit tests passing. The test also exposed metadata gaps worth fixing.
+See [eval/EVALUATION.md](eval/EVALUATION.md).
+
 ## Tools
 
 | Tool | What it does |
@@ -93,8 +105,10 @@ src/houston_opendata/
 ├── prompts/
 └── resources/
 scripts/smoke_test.py       # Checks a running server with a real MCP client
+scripts/run_eval.py         # Collects known answers and response times
 tests/                      # Tests that run without network access
 eval/EVALUATION.md          # Evaluation write-up for the hackathon submission
+eval/results.md             # Raw output of scripts/run_eval.py
 deploy/streamlit/           # Hosting guide
 ```
 
@@ -106,7 +120,8 @@ call it from `tools/__init__.py`. Put any portal call in `portal.py`.
 ## Security
 
 - Tools use only allow-listed CKAN read actions. There is no SQL endpoint and no write action.
-- The portal address comes from server configuration, never from a tool argument.
+- The portal and City GIS addresses come from server code and configuration, never from
+  a tool argument.
 - Identifiers are validated before any request, and upstream errors are sanitized.
 - The endpoint has no authentication, which suits public data. Review your agency's
   requirements before using it beyond the hackathon.
