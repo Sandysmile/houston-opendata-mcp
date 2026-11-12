@@ -1,18 +1,6 @@
-"""MCP server entry point.
+"""Houston Open Data MCP server: builds the FastMCP instance and picks a transport.
 
-Keep this file THIN. It only:
-  1. creates the FastMCP instance,
-  2. registers tools / prompts / resources / routes from the submodules, and
-  3. decides which transport to run (stdio locally vs. HTTP when deployed).
-
-All real logic lives in the submodules:
-  - tools/      one file per tool (each exposes `register(mcp)`)
-  - prompts/    reusable conversation starters
-  - resources/  static/semi-static data the client can read directly
-  - routes.py   HTTP-only infrastructure (health check, etc.)
-  - config.py   settings loaded from env vars / .env
-  - models.py   Pydantic models & enums for tool parameters
-  - utils.py    shared helpers (HTTP client, formatting, pagination)
+Tools, prompts, resources, and routes live in their own submodules.
 """
 
 from __future__ import annotations
@@ -37,7 +25,6 @@ mcp = FastMCP(
     ),
 )
 
-# Wire up everything the server exposes. Each aggregator lives in its submodule.
 register_tools(mcp)
 register_prompts(mcp)
 register_resources(mcp)
@@ -57,14 +44,13 @@ def main() -> None:
     """Start the server, choosing a transport based on the environment.
 
     Precedence:
-      1. A platform-injected port (Databricks `DATABRICKS_APP_PORT` or a generic
-         `PORT`) → run HTTP on that port. Cloud hosts set this for you.
+      1. A platform-injected `PORT` → run HTTP on that port. Cloud hosts set this.
       2. `MCP_TRANSPORT=streamable-http` in the environment → run HTTP on
          `MCP_HOST`:`MCP_PORT` (see config.py / .env).
       3. Otherwise → stdio, which is how local clients (Claude Desktop, Claude
          Code, Zed) launch the server as a subprocess.
     """
-    platform_port = os.getenv("DATABRICKS_APP_PORT") or os.getenv("PORT")
+    platform_port = os.getenv("PORT")
 
     if platform_port:
         mcp.run(

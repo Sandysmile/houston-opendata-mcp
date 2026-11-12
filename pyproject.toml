@@ -26,9 +26,7 @@ build-backend = "hatchling.build"
 packages = ["src/houston_opendata"]
 
 [dependency-groups]
-# Dev + eval-only deps. Install with `uv sync --group dev`.
-# The Phoenix evaluation harness (see eval/) is not scaffolded in this template
-# on purpose — add these when you build it per the mcp-eval skill.
+# Dev-only deps. Install with `uv sync --group dev`.
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -38,7 +36,7 @@ dev = [
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-exclude = [".venv", ".agents"]
+exclude = [".venv"]
 # Don't reformat Python code fences inside Markdown docs (they're illustrative
 # snippets, not runnable modules).
 extend-exclude = ["*.md"]

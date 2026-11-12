@@ -4,14 +4,6 @@ venv/
 
 # Environment variables (keep .env.example, never commit .env)
 .env
-deploy/**/.env
-deploy/**/eval.env
-
-# Deploy kit generated artifacts
-deploy/ibm/local-mcp-toolkit/_stage/
-deploy/ibm/local-mcp-toolkit/_toolkit.generated.yaml
-deploy/**/eval-results/
-
 
 # IBM Bob IDE directory (skills and MCP tool definition)
 .bob/
@@ -41,8 +33,6 @@ htmlcov/
 *.swp
 
 # Ignore reference files for Databricks agnet 
-eval/databricks/agent_server/agent.py
-eval/databricks/agent_server/utils.py 
 
 # Streamlit secrets (API key, app password)
 .streamlit/secrets.toml

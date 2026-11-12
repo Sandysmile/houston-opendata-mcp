@@ -75,8 +75,7 @@ super neighborhoods. Both apps also give the agent today's date in Houston time.
 
 See **[deploy/streamlit/README.md](deploy/streamlit/README.md)**. One process serves
 the Streamlit page at `/` and MCP at `/api/mcp`. Streamlit Community Cloud may block
-outside MCP clients, so test it with `scripts/smoke_test.py`. The template's IBM and
-Databricks kits are in [deploy/](deploy/README.md), but they haven't been tested with this server.
+outside MCP clients, so test it with `scripts/smoke_test.py`.
 
 ## Repo layout
 
@@ -96,7 +95,7 @@ src/houston_opendata/
 scripts/smoke_test.py       # Checks a running server with a real MCP client
 tests/                      # Tests that run without network access
 eval/EVALUATION.md          # Evaluation write-up for the hackathon submission
-deploy/                     # Deployment kits
+deploy/streamlit/           # Hosting guide
 ```
 
 ## Add a tool

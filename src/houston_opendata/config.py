@@ -22,8 +22,7 @@ class Settings(BaseSettings):
     # "stdio"           — local subprocess (Claude Desktop / Claude Code / Zed)
     # "streamable-http" — remote HTTP server (containers, cloud deploys)
     #
-    # NOTE: app.py also auto-selects HTTP when a platform injects DATABRICKS_APP_PORT
-    # or PORT, so you usually do NOT need to set this on a cloud host.
+    # app.py also switches to HTTP when a platform sets PORT.
     mcp_transport: str = "stdio"
     mcp_host: str = "0.0.0.0"
     mcp_port: int = 8000

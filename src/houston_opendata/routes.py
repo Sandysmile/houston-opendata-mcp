@@ -3,9 +3,8 @@
 These are only active when the server runs over HTTP (streamable-http). They
 sit alongside the `/mcp` endpoint on the same app.
 
-The `/health` route matters for cloud deploys: cloud.gov, IBM Code Engine, and
-Databricks Apps all use an HTTP health check to decide the app started
-correctly. Keep it fast and dependency-free.
+The `/health` route lets a container host check that the app started.
+Keep it fast and dependency-free.
 """
 
 from __future__ import annotations

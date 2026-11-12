@@ -8,7 +8,7 @@ Working notes for the hackathon's evaluation deliverable. Replace each `TODO` wi
 |---|---|---|
 | Unit | `uv run pytest tests/ -v` uses canned CKAN responses and a real MCP client | TODO: record result |
 | End to end | `scripts/smoke_test.py` runs the handshake, tool list, and a live search | TODO: record local and hosted results |
-| Agent | Ask an LLM the questions below using only these tools (see the `mcp-eval` skill) | TODO |
+| Agent | Ask an LLM the questions below using only these tools | TODO |
 
 ## Agent questions
 

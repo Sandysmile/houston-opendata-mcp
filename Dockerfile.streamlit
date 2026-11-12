@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1
 # Container image for the Streamlit host: page at /, MCP at /api/mcp.
-# The template's plain Dockerfile still serves MCP alone at /mcp.
 
 FROM python:3.11-slim
 
