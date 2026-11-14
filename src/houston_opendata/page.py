@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import os
 import sys
 from pathlib import Path
 
@@ -18,7 +19,10 @@ from houston_opendata.config import settings  # noqa: E402
 MAX_QUESTIONS = 10
 HISTORY_MESSAGES = 7  # Odd, so the window always starts with a question.
 EXAMPLES = "Try: Which datasets cover council districts?"
-PLUS_EXAMPLES = "Try: I just moved to 901 Bagby St. Who represents me?"
+PLUS_EXAMPLES = (
+    "Try: I just moved to 901 Bagby St. Who represents me? Or: Is this weekend "
+    "a good time to be outside in 77004?"
+)
 GIS_HUB_URL = "https://houston-mycity.opendata.arcgis.com"
 
 TOOLS = [
@@ -34,6 +38,8 @@ PLUS_TOOLS = [
         "houston_lookup_address",
         "Find an address's city limits, council district, and super neighborhood",
     ),
+    ("houston_weather_forecast", "Weather forecast and alerts for a Houston ZIP code"),
+    ("houston_air_quality", "Air quality now and forecast for a Houston ZIP code"),
 ]
 
 
@@ -130,8 +136,13 @@ def render_chat() -> None:
 
 
 USE_ARCGIS = arcgis_on()
+# The air quality tool reads its key from the environment at call time.
+if secret("AIRNOW_API_KEY") and not os.environ.get("AIRNOW_API_KEY"):
+    os.environ["AIRNOW_API_KEY"] = secret("AIRNOW_API_KEY")
 APP_NAME = "Ask Houston+" if USE_ARCGIS else "Ask Houston"
-SOURCES = "Open Data Portal + City GIS" if USE_ARCGIS else "Open Data Portal"
+SOURCES = (
+    "Open Data Portal + City GIS + Weather & Air" if USE_ARCGIS else "Open Data Portal"
+)
 
 st.set_page_config(page_title=APP_NAME, layout="centered")
 
@@ -140,7 +151,12 @@ st.caption(f"Houston Open Data MCP · {SOURCES}")
 st.write(
     "Lets an AI assistant search and read public data from the "
     f"[City of Houston Open Data portal]({settings.portal_url})"
-    + (f" and [selected City GIS data sources]({GIS_HUB_URL})" if USE_ARCGIS else "")
+    + (
+        f", [selected City GIS data sources]({GIS_HUB_URL}), and federal weather "
+        "and air quality data"
+        if USE_ARCGIS
+        else ""
+    )
     + ". It only reads data, and it needs no sign-in."
 )
 st.caption("Hackathon prototype. Not an official City of Houston service.")

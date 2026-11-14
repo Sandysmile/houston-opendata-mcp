@@ -49,6 +49,13 @@ ANTHROPIC_API_KEY = "your-key"
 APP_PASSWORD = "a-long-password-you-choose"
 ```
 
+For Ask Houston+, also add a free [AirNow](https://docs.airnowapi.org) key so the air
+quality tool works. The weather tool needs no key.
+
+```toml
+AIRNOW_API_KEY = "your-airnow-key"
+```
+
 Set a spending limit for the key in the Claude Console. The per-session question limit
 resets on refresh, so the password and spending limit are what actually control cost.
 The agent runs its tools inside the app, so it doesn't need `/api/mcp` to be reachable.
