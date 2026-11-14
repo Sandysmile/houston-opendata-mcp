@@ -253,18 +253,120 @@ def airnow_key() -> str:
     return os.environ.get("AIRNOW_API_KEY", "").strip() or settings.airnow_api_key
 
 
-def _reading(r: dict[str, Any]) -> dict[str, Any]:
-    category = r.get("Category") or {}
-    aqi = r.get("AQI")
+# AirNow retired its latLong and zipCode services on September 30, 2026. These
+# are the replacements announced in June 2026. Their field names are camelCase
+# (nowcastAQI, aqiCategoryName, reportingAreaName), and an area with no data
+# answers 200 with a {"WebServiceError": [...]} envelope instead of [].
+AIR_CURRENT_PATH = "/aq/observation/current/ziplatlong/"
+AIR_FORECAST_PATH = "/aq/forecast/current/"
+
+# EPA AQI category upper bounds, used when a response gives a number but no name.
+_AQI_CATEGORIES = [
+    (50, "Good"),
+    (100, "Moderate"),
+    (150, "Unhealthy for Sensitive Groups"),
+    (200, "Unhealthy"),
+    (300, "Very Unhealthy"),
+]
+
+
+def _pick(row: dict[str, Any], *names: str) -> Any:
+    """The first non-empty value among several spellings of a field."""
+    for name in names:
+        value = row.get(name)
+        if value not in (None, ""):
+            return value.strip() if isinstance(value, str) else value
+    return None
+
+
+def _aqi(value: Any) -> int | None:
+    try:
+        number = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return number if number >= 0 else None  # AirNow uses -1 for "no number".
+
+
+def aqi_category(aqi: int | None) -> str | None:
+    if aqi is None:
+        return None
+    for upper, name in _AQI_CATEGORIES:
+        if aqi <= upper:
+            return name
+    return "Hazardous"
+
+
+def _category(row: dict[str, Any], aqi: int | None) -> str | None:
+    name = _pick(row, "aqiCategoryName", "categoryName", "category")
+    if isinstance(name, dict):
+        name = name.get("Name") or name.get("name")
+    if not name:
+        name = (row.get("Category") or {}).get("Name")
+    return name or aqi_category(aqi)
+
+
+def _rows(payload: Any) -> list[dict[str, Any]]:
+    """AirNow rows, treating the no-data envelope as an empty list."""
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict) and "WebServiceError" in payload:
+        return []
+    raise PortalError("AirNow returned an unexpected response.", _AIR_HINT)
+
+
+def _current_reading(r: dict[str, Any]) -> dict[str, Any]:
+    aqi = _aqi(_pick(r, "nowcastAQI", "aqi", "AQI"))
     return {
-        "pollutant": r.get("ParameterName"),
-        "aqi": aqi if isinstance(aqi, int) and aqi >= 0 else None,
-        "category": category.get("Name"),
+        "pollutant": _pick(r, "parameterName", "ParameterName"),
+        "aqi": aqi,
+        "category": _category(r, aqi),
     }
 
 
+def _forecast_reading(r: dict[str, Any]) -> dict[str, Any]:
+    aqi = _aqi(_pick(r, "aqi", "forecastAQI", "AQI"))
+    return {
+        "pollutant": _pick(r, "parameterName", "ParameterName"),
+        "aqi": aqi,
+        "category": _category(r, aqi),
+    }
+
+
+def _observed(row: dict[str, Any]) -> str | None:
+    if not row:
+        return None
+    date = _pick(row, "dateObserved", "DateObserved", "validDate")
+    hour = _pick(row, "hourObserved", "HourObserved", "timeObserved")
+    if isinstance(hour, int):
+        hour = f"{hour}:00"
+    zone = _pick(row, "localTimeZone", "timeZone", "LocalTimeZone")
+    text = " ".join(str(v) for v in (date, hour, zone) if v)
+    return text or None
+
+
+def _forecast_days(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    days: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        date = str(
+            _pick(r, "dateValid", "dateForecast", "forecastDate", "DateForecast") or ""
+        ).strip()
+        day = days.setdefault(
+            date,
+            {"date": date, "readings": [], "action_day": False, "discussion": None},
+        )
+        day["readings"].append(_forecast_reading(r))
+        action = _pick(r, "actionDay", "ActionDay")
+        day["action_day"] = day["action_day"] or action in (True, "true", "True", 1)
+        day["discussion"] = day["discussion"] or _pick(r, "discussion", "Discussion")
+    return list(days.values())
+
+
 async def air_quality(zip_code: str | None = None) -> dict:
-    """Current air quality and the AirNow forecast for a Houston ZIP code."""
+    """Current air quality and the AirNow forecast for a Houston ZIP code.
+
+    The current reading and the forecast are separate requests. If only one of
+    them fails, the other is still returned, with a note about the gap.
+    """
     place = resolve_zip(zip_code)
     if not place["found"]:
         return place
@@ -284,48 +386,45 @@ async def air_quality(zip_code: str | None = None) -> dict:
             "API_KEY": api_key,
         }
         current, forecast = await asyncio.gather(
-            _get(
-                AIRNOW_ORIGIN,
-                "/aq/observation/latLong/current/",
-                params,
-                "AirNow",
-                _AIR_HINT,
-            ),
-            _get(AIRNOW_ORIGIN, "/aq/forecast/latLong/", params, "AirNow", _AIR_HINT),
+            _get(AIRNOW_ORIGIN, AIR_CURRENT_PATH, params, "AirNow", _AIR_HINT),
+            _get(AIRNOW_ORIGIN, AIR_FORECAST_PATH, params, "AirNow", _AIR_HINT),
+            return_exceptions=True,
         )
-        if not isinstance(current, list) or not isinstance(forecast, list):
-            raise PortalError("AirNow returned an unexpected response.", _AIR_HINT)
-
-        days: dict[str, dict[str, Any]] = {}
-        for r in forecast:
-            date = str(r.get("DateForecast") or "").strip()
-            day = days.setdefault(
-                date, {"date": date, "readings": [], "discussion": None}
+        problems: list[str] = []
+        parts: list[list[dict[str, Any]]] = []
+        for label, payload in (("current reading", current), ("forecast", forecast)):
+            if isinstance(payload, BaseException):
+                if not isinstance(payload, PortalError):
+                    raise payload
+                problems.append(f"The AirNow {label} wasn't available: {payload.error}")
+                parts.append([])
+                continue
+            try:
+                parts.append(_rows(payload))
+            except PortalError as exc:
+                problems.append(f"The AirNow {label} wasn't available: {exc.error}")
+                parts.append([])
+        if len(problems) == 2:
+            raise PortalError(
+                "AirNow couldn't be reached. " + " ".join(problems), _AIR_HINT
             )
-            day["readings"].append(_reading(r))
-            day["discussion"] = day["discussion"] or r.get("Discussion") or None
-            day["action_day"] = bool(r.get("ActionDay")) or day.get("action_day", False)
+        current_rows, forecast_rows = parts
 
-        first = current[0] if current else {}
-        observed = None
-        if first:
-            observed = (
-                f"{str(first.get('DateObserved') or '').strip()} "
-                f"{first.get('HourObserved')}:00 {first.get('LocalTimeZone') or ''}"
-            ).strip()
-        area = first.get("ReportingArea")
-        if not area and forecast:
-            area = forecast[0].get("ReportingArea")
-        cached = _remember(
-            key,
-            {
-                "reporting_area": area,
-                "observed": observed,
-                "current": [_reading(r) for r in current],
-                "forecast": list(days.values()),
-            },
-            AIR_TTL,
-        )
+        first = current_rows[0] if current_rows else {}
+        area = _pick(first, "reportingAreaName", "reportingArea", "ReportingArea")
+        if not area and forecast_rows:
+            area = _pick(
+                forecast_rows[0], "reportingAreaName", "reportingArea", "ReportingArea"
+            )
+        value = {
+            "reporting_area": area,
+            "observed": _observed(first),
+            "current": [_current_reading(r) for r in current_rows],
+            "forecast": _forecast_days(forecast_rows),
+            "problems": problems,
+        }
+        # Don't keep a partial answer for long; try again on the next question.
+        cached = _remember(key, value, 120 if problems else AIR_TTL)
 
     note = (
         "AirNow reports air quality by reporting area, not by ZIP code. Most "
@@ -335,6 +434,8 @@ async def air_quality(zip_code: str | None = None) -> dict:
     if not cached["current"] and not cached["forecast"]:
         note = "AirNow has no current reading or forecast near this ZIP code."
     result = {**place, **cached, "about_the_data": note}
+    if not result["problems"]:
+        result.pop("problems")
     result["sources"] = [AIR_SOURCE]
     result["zip_source"] = ZIP_SOURCE
     return result
