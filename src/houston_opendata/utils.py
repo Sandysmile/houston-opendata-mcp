@@ -22,7 +22,9 @@ MAX_RESPONSE_BYTES = 5_000_000
 # Keep outbound origins operator-controlled. Do not replace this with a tool
 # argument; add another narrowly scoped client when integrating another API.
 API_BASE_URL = settings.ckan_api_url
-USER_AGENT = "houston-opendata-mcp/0.1"
+# The National Weather Service asks every client to identify itself with a
+# User-Agent that includes a way to reach the operator.
+USER_AGENT = "houston-opendata-mcp/0.1 (github.com/Sandysmile/houston-opendata-mcp)"
 
 
 class UpstreamServiceError(RuntimeError):

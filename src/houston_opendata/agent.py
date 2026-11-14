@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from houston_opendata import gis, portal
+from houston_opendata import conditions, gis, portal
 from houston_opendata.config import settings
 
 MAX_TOOL_ROUNDS = 6
@@ -38,7 +38,14 @@ whether the address is inside city limits, its council district, and its super
 neighborhood. Inside city limits, also mention that the five at-large council
 members and the Mayor represent every resident. If the user gives only a ZIP code,
 explain that ZIP codes can cross district lines, show the overlap from the
-portal's jurisdiction tables, and ask for a street address for an exact answer."""
+portal's jurisdiction tables, and ask for a street address for an exact answer.
+
+For weather, rain, storms, or outdoor plans, use houston_weather_forecast. Mention
+any active alerts first. For air quality or whether it's healthy to be outside, use
+houston_air_quality, and say that its readings are citywide, not neighborhood-level.
+For a question about being outside, use both. Both take a Houston ZIP code; if the
+user gives none, use downtown and say so. Cite the National Weather Service or EPA
+AirNow, and say when the forecast was issued or the reading was taken."""
 
 HOUSTON_TIME = ZoneInfo("America/Chicago")
 
@@ -144,9 +151,39 @@ ADDRESS_TOOL: dict[str, Any] = {
 }
 
 
+_ZIP = _string("Houston ZIP code, such as 77002. Omit for downtown.")
+
+WEATHER_TOOL: dict[str, Any] = {
+    "name": "houston_weather_forecast",
+    "description": "National Weather Service forecast and active weather alerts "
+    "(such as flood warnings) for a ZIP code in the City of Houston.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "zip_code": _ZIP,
+            "periods": {
+                "type": "integer",
+                "description": "Day and night periods to return, 1 to 14. "
+                "Default 6 (three days).",
+            },
+        },
+    },
+}
+
+AIR_TOOL: dict[str, Any] = {
+    "name": "houston_air_quality",
+    "description": "Current air quality (AQI) and the air quality forecast from EPA "
+    "AirNow for a ZIP code in the City of Houston. Readings are citywide.",
+    "input_schema": {"type": "object", "properties": {"zip_code": _ZIP}},
+}
+
+PLUS_TOOLS = [ADDRESS_TOOL, WEATHER_TOOL, AIR_TOOL]
+
+
 def tools(use_arcgis: bool = False) -> list[dict[str, Any]]:
-    """The portal tools, plus the address lookup in Ask Houston+."""
-    return TOOLS + [ADDRESS_TOOL] if use_arcgis else list(TOOLS)
+    """The portal tools, plus the address, weather, and air quality tools in
+    Ask Houston+."""
+    return TOOLS + PLUS_TOOLS if use_arcgis else list(TOOLS)
 
 
 def _paging(args: dict[str, Any]) -> tuple[int, int]:
@@ -157,6 +194,12 @@ def _paging(args: dict[str, Any]) -> tuple[int, int]:
 async def _call(name: str, args: dict[str, Any], use_arcgis: bool = False) -> Any:
     if name == "houston_lookup_address" and use_arcgis:
         return await gis.lookup_address(args["address"])
+    if name == "houston_weather_forecast" and use_arcgis:
+        return await conditions.weather_forecast(
+            args.get("zip_code"), int(args.get("periods") or 6)
+        )
+    if name == "houston_air_quality" and use_arcgis:
+        return await conditions.air_quality(args.get("zip_code"))
     if name == "houston_search_datasets":
         limit, offset = _paging(args)
         return await portal.search_datasets(

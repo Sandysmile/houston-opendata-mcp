@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from houston_opendata.config import settings
 from houston_opendata.tools import (
+    air_quality,
     describe_table,
     get_dataset,
     list_groups,
@@ -15,6 +16,7 @@ from houston_opendata.tools import (
     lookup_address,
     query_records,
     search_datasets,
+    weather_forecast,
 )
 
 
@@ -28,6 +30,8 @@ def register_tools(mcp) -> None:
     list_groups.register(mcp)
     if settings.use_arcgis:  # Ask Houston+ only
         lookup_address.register(mcp)
+        weather_forecast.register(mcp)
+        air_quality.register(mcp)
 
 
 __all__ = ["register_tools"]

@@ -41,5 +41,11 @@ class Settings(BaseSettings):
     # the City's ArcGIS Online layers. The layers themselves are fixed in gis.py.
     use_arcgis: bool = False
 
+    # ── Weather and air quality (Ask Houston+) ────────────────────────────────
+    # The weather forecast (National Weather Service) needs no key. Air quality
+    # (EPA AirNow) needs a free key from https://docs.airnowapi.org. Keep it in
+    # Streamlit secrets or a local .env file, never in the repo.
+    airnow_api_key: str = ""
+
 
 settings = Settings()

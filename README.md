@@ -35,11 +35,17 @@ See [eval/EVALUATION.md](eval/EVALUATION.md).
 | `houston_list_organizations` | List departments and their dataset counts |
 | `houston_list_groups` | List topic groups and their dataset counts |
 
-With `USE_ARCGIS=true`, the server adds a seventh tool:
+With `USE_ARCGIS=true`, the server adds three more tools:
 
 | Tool | What it does |
 |---|---|
 | `houston_lookup_address` | Find an address's city limits, council district, and super neighborhood, using City GIS layers on ArcGIS Online |
+| `houston_weather_forecast` | Weather forecast and active alerts for a Houston ZIP code, from the National Weather Service (no key needed) |
+| `houston_air_quality` | Current air quality and forecast for a Houston ZIP code, from EPA AirNow (needs `AIRNOW_API_KEY`) |
+
+Both ZIP code tools use `src/houston_opendata/data/houston_zip_centroids.csv`: the 118
+ZIP codes fully or partially within the City (from the open data portal), each with a
+center point from the Census Bureau's 2026 ZCTA Gazetteer.
 
 The server also offers two prompts (`explore_houston_topic`, `compare_by_geography`)
 and two resources (`houston://info/server`, `houston://docs/join-keys`).
@@ -77,11 +83,13 @@ One codebase runs as two apps, so the only difference between them is the data:
 | App | `USE_ARCGIS` | Data sources |
 |---|---|---|
 | **Ask Houston** | `"false"` (default) | Open Data Portal |
-| **Ask Houston+** | `"true"` | Open Data Portal + City GIS address lookup |
+| **Ask Houston+** | `"true"` | Open Data Portal + City GIS address lookup + weather (NWS) and air quality (AirNow) by ZIP code |
 
 Set `USE_ARCGIS` in each Streamlit app's secrets. The City GIS layers are fixed in
 `src/houston_opendata/gis.py`: site addresses, city limits, council districts, and
-super neighborhoods. Both apps also give the agent today's date in Houston time.
+super neighborhoods. For air quality, also add `AIRNOW_API_KEY` to Ask Houston+'s
+secrets; a free key comes from <https://docs.airnowapi.org>. Both apps also give the
+agent today's date in Houston time.
 
 ## Host it
 
@@ -99,6 +107,8 @@ src/houston_opendata/
 ├── app.py                  # Builds FastMCP, picks the transport
 ├── portal.py               # Read-only CKAN client, shared by the tools and the page
 ├── gis.py                  # Read-only City GIS client for Ask Houston+
+├── conditions.py           # Weather (NWS) and air quality (AirNow) by ZIP code
+├── data/                   # Houston ZIP codes with center points
 ├── page.py                 # Streamlit page
 ├── config.py, models.py, utils.py, routes.py
 ├── tools/                  # One file per tool
