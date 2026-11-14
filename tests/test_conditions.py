@@ -47,48 +47,65 @@ ALERTS = {
         }
     ]
 }
+# Shapes of AirNow's 2026 services, which replaced the latLong ones.
 AIR_NOW = [
     {
-        "DateObserved": "2026-11-13 ",
-        "HourObserved": 19,
-        "LocalTimeZone": "CST",
-        "ReportingArea": "Houston",
-        "ParameterName": "O3",
-        "AQI": 42,
-        "Category": {"Number": 1, "Name": "Good"},
-    }
+        "dateObserved": "2026-11-13",
+        "hourObserved": "19:00",
+        "localTimeZone": "CST",
+        "reportingAreaName": "Houston",
+        "parameterName": "OZONE",
+        "nowcastAQI": 42,
+        "aqiCategoryName": "Good",
+    },
+    {
+        "dateObserved": "2026-11-13",
+        "hourObserved": "19:00",
+        "localTimeZone": "CST",
+        "reportingAreaName": "Houston",
+        "parameterName": "PM2.5",
+        "nowcastAQI": 61,
+    },
 ]
 AIR_FORECAST = [
     {
-        "DateForecast": "2026-11-14 ",
-        "ReportingArea": "Houston",
-        "ParameterName": "PM2.5",
-        "AQI": -1,
-        "Category": {"Number": 2, "Name": "Moderate"},
-        "ActionDay": False,
-        "Discussion": "Light winds.",
+        "dateValid": "2026-11-14",
+        "reportingAreaName": "Houston",
+        "parameterName": "PM2.5",
+        "aqi": -1,
+        "categoryName": "Moderate",
+        "actionDay": False,
+        "discussion": "Light winds.",
     }
 ]
+
+
+class Calls(list):
+    responses: dict
 
 
 @pytest.fixture
 def upstream(monkeypatch):
-    calls: list[tuple[str, str, dict]] = []
+    calls = Calls()
     responses = {
         "/points/29.7568,-95.3657": POINTS,
         "/gridpoints/HGX/65,97/forecast": FORECAST,
         "/alerts/active": ALERTS,
-        "/aq/observation/latLong/current/": AIR_NOW,
-        "/aq/forecast/latLong/": AIR_FORECAST,
+        conditions.AIR_CURRENT_PATH: AIR_NOW,
+        conditions.AIR_FORECAST_PATH: AIR_FORECAST,
     }
 
     async def fake_get(origin, path, params, service, hint):
         calls.append((origin, path, dict(params)))
-        return responses[path]
+        answer = responses[path]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
 
     monkeypatch.setattr(conditions, "_get", fake_get)
     monkeypatch.setattr(conditions, "_cache", {})
     monkeypatch.setenv("AIRNOW_API_KEY", "test-key")
+    calls.responses = responses
     return calls
 
 
@@ -148,13 +165,66 @@ async def test_air_quality(upstream):
 
     assert result["reporting_area"] == "Houston"
     assert result["observed"] == "2026-11-13 19:00 CST"
-    assert result["current"] == [{"pollutant": "O3", "aqi": 42, "category": "Good"}]
+    assert result["current"] == [
+        {"pollutant": "OZONE", "aqi": 42, "category": "Good"},
+        {"pollutant": "PM2.5", "aqi": 61, "category": "Moderate"},  # from the AQI
+    ]
     day = result["forecast"][0]
     assert day["date"] == "2026-11-14"
-    assert day["readings"][0]["aqi"] is None  # AirNow uses -1 for no number.
+    assert day["readings"][0] == {
+        "pollutant": "PM2.5",
+        "aqi": None,  # AirNow uses -1 for no number.
+        "category": "Moderate",
+    }
+    assert day["discussion"] == "Light winds."
     assert "citywide" in result["about_the_data"]
+    assert "problems" not in result
+    assert {path for _, path, _ in upstream} == {
+        conditions.AIR_CURRENT_PATH,
+        conditions.AIR_FORECAST_PATH,
+    }
     assert all(origin == conditions.AIRNOW_ORIGIN for origin, _, _ in upstream)
     assert upstream[0][2]["API_KEY"] == "test-key"
+
+
+async def test_air_quality_no_data_envelope(upstream):
+    upstream.responses[conditions.AIR_CURRENT_PATH] = {
+        "WebServiceError": [{"Message": "No data"}]
+    }
+    result = await conditions.air_quality("77002")
+    assert result["current"] == []
+    assert result["reporting_area"] == "Houston"  # from the forecast
+
+
+async def test_air_quality_keeps_the_half_that_worked(upstream):
+    upstream.responses[conditions.AIR_FORECAST_PATH] = portal.PortalError(
+        "AirNow returned status 410.", "hint"
+    )
+    result = await conditions.air_quality("77002")
+    assert result["current"][0]["aqi"] == 42
+    assert result["forecast"] == []
+    assert "410" in result["problems"][0]
+
+
+async def test_air_quality_fails_when_both_halves_fail(upstream):
+    for path in (conditions.AIR_CURRENT_PATH, conditions.AIR_FORECAST_PATH):
+        upstream.responses[path] = portal.PortalError(
+            "AirNow returned status 401.", "hint"
+        )
+    with pytest.raises(portal.PortalError) as caught:
+        await conditions.air_quality("77002")
+    assert "401" in caught.value.error
+
+
+def test_aqi_categories():
+    assert [conditions.aqi_category(n) for n in (0, 50, 51, 151, 301)] == [
+        "Good",
+        "Good",
+        "Moderate",
+        "Unhealthy",
+        "Hazardous",
+    ]
+    assert conditions.aqi_category(None) is None
 
 
 async def test_air_quality_without_a_key(upstream, monkeypatch):
