@@ -130,9 +130,13 @@ async def known_answers(
     council = await call(
         client, "houston_search_datasets", {"query": "council district"}
     )
+    # List the titles: keyword search can return false matches (such as Property
+    # Tax), which need to be checked by hand.
+    titles = "; ".join(d["title"] for d in council.get("datasets", []))
     lines.append(
         f"| 3 | How many datasets include council district data? | "
-        f'{council.get("total")} (keyword search for "council district") |'
+        f'{council.get("total")} results for "council district" ({titles}). '
+        "Check each by hand: some only mention the words. |"
     )
 
     # Q4. Newest budget year

@@ -1,17 +1,18 @@
 # Evaluation
 
 Evaluation of Ask Houston (open data portal) and Ask Houston+ (adds City GIS
-address lookup, weather and air quality). Agent questions 1–6 were run on November
-11, 2026; the tools were redesigned and re-measured, and questions 7–8 asked, on
-November 15, 2026, against
-the live City of Houston Open Data portal, City ArcGIS layers, the National Weather
-Service and EPA AirNow. Raw output: [results.md](results.md).
+address lookup, weather and air quality), run against the live City of Houston Open
+Data portal, City ArcGIS layers, the National Weather Service and EPA AirNow. The
+tools were redesigned and every measurement repeated on November 15, 2026; all 8
+agent questions were asked that day in Claude Desktop, connected to the MCP server
+over stdio. Raw output: [results.md](results.md).
 
 ## Summary
 
 | Measure | Result |
 |---|---|
-| Agent questions answered correctly | 8 of 8, including server-side summary and weather + air quality |
+| Agent questions answered correctly | 8 of 8 in Claude Desktop over MCP, on the final tools |
+| Answer-key errors the agent caught | 2 (questions 3 and 4) |
 | Unit tests | 74 of 74 passing, locally and in CI |
 | Live tool calls | 70 across all 7 measured tools, with 0 errors |
 | Median tool response time | 0.15–0.58 seconds (live, uncached) |
@@ -22,27 +23,40 @@ Service and EPA AirNow. Raw output: [results.md](results.md).
 |---|---|---|
 | Unit | `uv run pytest tests/ -v`: canned portal, GIS, weather and air quality responses through a real MCP client, no network | 74 passed |
 | CI | GitHub Actions runs lint, format check and tests on every push | Passing |
-| Known answers | `scripts/run_eval.py` calls the tools against the live services and records the correct answer to each question | Collected for all 8 questions |
-| Agent | Questions 1–6 asked in the Streamlit chat (Nov 11); questions 7–8 asked in Claude Desktop connected to the MCP server over stdio (Nov 15); scored against the known answers | 8 of 8 matched |
+| Known answers | `scripts/run_eval.py` calls the tools against the live services and records the correct answer to each question; checked by hand | Collected for all 8 questions; 2 corrected |
+| Agent | All 8 questions asked in Claude Desktop connected to the MCP server over stdio, each in a new chat (Nov 15); scored against the known answers | 8 of 8 matched |
 
 ## Agent questions
 
 Questions 1–5 and 7 use Ask Houston tools; questions 6 and 8 need Ask Houston+.
-Questions 1–6 were asked in the Streamlit chat, which calls the same tool functions
-directly. Questions 7–8 were asked in Claude Desktop, connected to the MCP server
-over stdio, so the tools were checked through both the web app and a standard MCP
-client.
+Each question was asked in a new Claude Desktop chat on November 15, after Claude
+Desktop was restarted and its tool list confirmed the redesigned tools.
 
 | # | Question | Known answer | Agent |
 |---|---|---|---|
-| 1 | Which department publishes the most datasets? | Legacy Portal (28), Planning and Development (25), Finance Department (13) | Matched |
-| 2 | What columns does the most recent Payroll table have, and how many rows? | Payroll 2026: 26,220 rows, 20 data columns plus the portal's `_id` | Matched |
-| 3 | How many datasets include council district data? | 4 by keyword search | Matched |
-| 4 | Which budget year is the newest on the portal? | 2013, from dataset titles | Matched |
-| 5 | What is the average commute time of City of Houston employees? | Not on the portal | Said the portal doesn't hold it; invented no number |
-| 6 | What council district and super neighborhood is 901 Bagby St in? | District I (record dated 2024); Downtown, super neighborhood 61 | Matched |
-| 7 | Which three departments have the most employees on the newest payroll? | Police (7,759), Fire (5,402), Houston Public Works (4,751); all 26,220 rows read on the server | Matched; also counted Active-only staff and checked no other department could outrank Public Works |
-| 8 | Is it a good time to be outside in 77002? | Nov 15, 9:35 a.m.: showers and thunderstorms, 60°F, 88% rain, no alerts; AQI 55 (Moderate) | Matched; led with the forecast, noted readings cover the whole region, suggested Monday instead |
+| 1 | Which department publishes the most datasets? | Planning and Development (25), then Finance (13). "Legacy Portal" (28) is a holding group, not a department | Matched; excluded Legacy Portal and noted 13 departments and topics publish nothing yet |
+| 2 | What columns does the most recent Payroll table have, and how many rows? | Payroll 2026: 26,220 rows, 20 data columns plus the portal's `_id` | Matched; also found Birth Year changed from number to text in 2024 |
+| 3 | How many datasets include council district data? | 3 by search (a 4th result, Property Tax, is a false match); at least 9 carry a district column | Matched; set aside the false matches and warned that search misses datasets with district columns |
+| 4 | Which budget year is the newest on the portal? | FY2025 (Budget 2025 table, updated Oct 17, 2024) | Matched; noted FY2026 and FY2027 are missing |
+| 5 | What is the average commute time of City of Houston employees? | Not on the portal | Said so, showed what it searched, invented no number |
+| 6 | What council district and super neighborhood is 901 Bagby St in? | District I (record dated 2024); Downtown, super neighborhood 61 | Matched; flagged the 2024 date on the district layer |
+| 7 | Which three departments have the most employees on the newest payroll? | Police (7,759), Fire (5,402), Houston Public Works (4,751), counted on the server | Matched; added Active-only counts and the Status breakdown |
+| 8 | Is it a good time to be outside in 77002? | Nov 15 morning: showers and thunderstorms, about 90% rain, no alerts; AQI 55 (Moderate) | Matched; led with the answer, noted readings cover the region, suggested Monday |
+
+### The agent corrected the answer key
+
+The first answer key came from simple keyword and title checks, and two of its
+answers were wrong. The agent caught both:
+
+- **Question 3.** Keyword search returns 4 datasets, but one is Property Tax, which
+  only mentions "City Council" and "Appraisal District." Checking columns found at
+  least 9 datasets with council district data, only 3 of them tagged.
+- **Question 4.** The key said 2013, the newest year in any dataset *title*. The
+  agent looked inside the Budget dataset, which holds one table per year through
+  Budget 2025. The evaluation script now looks inside datasets too.
+
+An earlier round on November 11 asked questions 1–6 in the Streamlit chat with the
+first version of the tools; its "match" on question 4 agreed with the wrong key.
 
 ## Comparison question: a new resident
 
@@ -125,12 +139,13 @@ request after the hosted app has been idle can take longer while it wakes up.
    Portal," which is not a department, so an honest answer to "who publishes the
    most?" is misleading. Recommendation: assign every dataset to its owning
    department.
-2. **Tagging limits discovery.** Only 4 datasets match "council district," although
-   district data is used more widely. Recommendation: apply consistent tags and
-   keywords for shared keys such as council district.
-3. **Titles carry freshness.** No budget dataset title is newer than 2013.
-   Recommendation: confirm whether newer budgets exist under other titles, and
-   publish update dates and schedules for featured datasets.
+2. **Tagging limits discovery.** Search finds 3 council district datasets, but at
+   least 9 carry a district column. Recommendation: tag every dataset with the
+   shared keys it contains, such as council district, super neighborhood and ZIP code.
+3. **Yearly tables hide freshness.** The newest budget, FY2025, sits inside one
+   dataset as "Budget 2025" and was last updated October 2024, so FY2026 and FY2027
+   are missing. Titles alone suggested 2013. Recommendation: publish update
+   schedules for featured datasets and keep yearly tables current.
 4. **GIS turns general answers into personal ones.** Address-level questions need
    the City's boundary layers; the district record's 2024 date also shows why
    update dates matter.
@@ -151,3 +166,9 @@ request after the hosted app has been idle can take longer while it wakes up.
    paging through hundreds of 100-row calls. Moving counting to the server made
    question 7 a single call. Recommendation: design MCP tools around the question
    being asked, not around the API's endpoints.
+9. **Schemas drift across years.** Payroll's Birth Year is a number in 2022–2023
+   and text from 2024, which breaks joins across years. Recommendation: keep column
+   types stable across yearly tables, as part of a machine-readable data standard.
+10. **Check the answer key, too.** The agent corrected two known answers. Build
+    known answers from the same depth of inspection the agent uses, and review any
+    disagreement before scoring it a failure.
