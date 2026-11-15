@@ -141,16 +141,24 @@ async def known_answers(
         "houston_search_datasets",
         {"query": "budget", "pagination": {"limit": 100}},
     )
-    found = [
-        (y, d["title"])
-        for d in budget.get("datasets", [])
-        for y in years_in(d.get("title", ""))
-    ]
+    # Look inside each dataset too: yearly tables (Budget 2018 ... Budget 2025)
+    # are resources of one dataset, so titles alone miss them.
+    found = []
+    for d in budget.get("datasets", []):
+        found += [(y, d["title"], d.get("portal_url")) for y in years_in(d["title"])]
+        if "budget" not in d.get("title", "").lower():
+            continue
+        detail = await call(client, "houston_get_dataset", {"dataset": d["name"]})
+        for r in detail.get("resources", []):
+            found += [
+                (y, f"{d['title']}: {r.get('name')}", r.get("portal_url"))
+                for y in years_in(r.get("name", ""))
+            ]
     if found:
-        year, title = max(found)
-        answer = f"{year} ({title})"
+        year, where, url = max(found)
+        answer = f"{year} ([{where}]({url}))"
     else:
-        answer = "No year found in budget dataset titles"
+        answer = "No year found in budget dataset or table names"
     lines.append(f"| 4 | Which budget year is the newest on the portal? | {answer} |")
 
     # Q5. Data the portal doesn't hold
