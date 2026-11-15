@@ -1,30 +1,33 @@
 # Evaluation
 
 Evaluation of Ask Houston (open data portal) and Ask Houston+ (adds City GIS
-address lookup), run on November 11, 2026 against the live City of Houston Open
-Data portal and City ArcGIS layers. Raw output: [results.md](results.md).
+address lookup, weather and air quality). Agent questions 1–6 were run on November
+11, 2026; the tools were redesigned and re-measured on November 15, 2026, against
+the live City of Houston Open Data portal, City ArcGIS layers, the National Weather
+Service and EPA AirNow. Raw output: [results.md](results.md).
 
 ## Summary
 
 | Measure | Result |
 |---|---|
-| Agent questions answered correctly | 6 of 6 |
-| Unit tests | 52 of 52 passing, locally and in CI |
-| Live tool calls | 30, with 0 errors |
-| Median tool response time | 0.16–0.21 seconds |
+| Agent questions answered correctly | 6 of 6 (questions 1–6) |
+| Known answers collected | 8 of 8, including server-side summary and weather + air quality |
+| Unit tests | 74 of 74 passing, locally and in CI |
+| Live tool calls | 70 across all 7 measured tools, with 0 errors |
+| Median tool response time | 0.15–0.58 seconds (live, uncached) |
 
 ## Testing methodology
 
 | Layer | How | Result |
 |---|---|---|
-| Unit | `uv run pytest tests/ -v`: canned portal and GIS responses through a real MCP client, no network | 52 passed |
+| Unit | `uv run pytest tests/ -v`: canned portal, GIS, weather and air quality responses through a real MCP client, no network | 74 passed |
 | CI | GitHub Actions runs lint, format check and tests on every push | Passing |
-| Known answers | `scripts/run_eval.py` calls the tools against the live portal and records the correct answer to each question | Collected for all 6 questions |
+| Known answers | `scripts/run_eval.py` calls the tools against the live services and records the correct answer to each question | Collected for all 8 questions |
 | Agent | The same questions asked in the Ask Houston and Ask Houston+ apps, scored against the known answers | 6 of 6 matched |
 
 ## Agent questions
 
-Questions 1–5 were asked in Ask Houston and question 6 in Ask Houston+.
+Questions 1–5 and 7 use Ask Houston tools; questions 6 and 8 need Ask Houston+.
 
 | # | Question | Known answer | Agent |
 |---|---|---|---|
@@ -34,6 +37,8 @@ Questions 1–5 were asked in Ask Houston and question 6 in Ask Houston+.
 | 4 | Which budget year is the newest on the portal? | 2013, from dataset titles | Matched |
 | 5 | What is the average commute time of City of Houston employees? | Not on the portal | Said the portal doesn't hold it; invented no number |
 | 6 | What council district and super neighborhood is 901 Bagby St in? | District I (record dated 2024); Downtown, super neighborhood 61 | Matched |
+| 7 | Which three departments have the most employees on the newest payroll? | Police (7,759), Fire (5,402), Houston Public Works (4,751); all 26,220 rows read on the server | Known answer collected Nov 15 |
+| 8 | Is it a good time to be outside in 77002? | Nov 15, 9:35 a.m.: showers and thunderstorms, 60°F, 88% rain, no alerts; AQI 55 (Moderate) | Known answer collected Nov 15; changes hourly |
 
 ## Comparison question: a new resident
 
@@ -60,16 +65,42 @@ reported no library listing. It also surfaced two new findings: the "Houston
 Libraries" dataset shows an update date of 2026-11-03 while its description says
 "Updated Aug 2023," and a search for "park" returned only parking datasets.
 
+## Tool design: built around user goals
+
+The first version's portal tools mirrored CKAN endpoints one to one, so a
+question such as "how many rows are in the newest payroll table?" took four calls
+(search, get, describe, query). On November 15 the tools were reworked around the
+questions people ask:
+
+| Change | Effect |
+|---|---|
+| `houston_browse_catalog` replaces two list tools | One call shows departments and topics, ranked, paged past CKAN's 25-item cap |
+| `houston_get_dataset` lists columns and row counts for queryable tables, read in parallel, and picks the newest | "Most recent payroll" is answered without guessing; question 2 dropped from three calls to one |
+| `houston_describe_table` adds sample rows | The agent sees how values are written before using exact-match filters |
+| `houston_query_records` summary mode | Counts, sums and averages per group computed on the server over up to 100,000 rows; question 7 read 26,220 rows in 0.15 seconds instead of 263 paged calls of 100 rows |
+| Pydantic input types in `models.py` for every tool | Shape and size are validated before any request; format problems still return a fix-it hint |
+
+Ask Houston now has 5 tools and Ask Houston+ has 8.
+
 ## Performance
 
-Each tool was called 10 times from a local run against the live portal and GIS
-layers (seconds).
+Each tool was called 10 times from a local run on November 15, 2026, against the
+live services (seconds).
 
 | Tool | First call | Median | Slowest | Errors |
 |---|---|---|---|---|
-| houston_search_datasets | 0.36 | 0.16 | 0.36 | 0 |
-| houston_query_records | 0.16 | 0.21 | 0.31 | 0 |
-| houston_lookup_address | 0.25 | 0.20 | 0.25 | 0 |
+| houston_search_datasets | 0.18 | 0.19 | 0.34 | 0 |
+| houston_browse_catalog | 0.59 | 0.58 | 0.78 | 0 |
+| houston_get_dataset | 0.38 | 0.43 | 0.49 | 0 |
+| houston_query_records | 0.13 | 0.15 | 0.18 | 0 |
+| houston_lookup_address | 0.27 | 0.20 | 0.27 | 0 |
+| houston_weather_forecast * | 0.28 | 0.00 | 0.28 | 0 |
+| houston_air_quality * | 0.27 | 0.00 | 0.27 | 0 |
+
+\* Weather and air quality responses are cached briefly on the server, so the
+first call measures the live National Weather Service and AirNow, and later calls
+measure the cache. `houston_browse_catalog` and `houston_get_dataset` are slower
+because each makes several portal requests in parallel.
 
 Hosted response times add the hosting platform's network latency, and the first
 request after the hosted app has been idle can take longer while it wakes up.
@@ -78,7 +109,9 @@ request after the hosted app has been idle can take longer while it wakes up.
 
 - Public data only, with read-only CKAN actions and no SQL endpoint.
 - Fixed upstream origins for the portal and GIS layers, no redirects, and a 5 MB response limit.
-- Identifiers are validated before any request. Errors are sanitized.
+- Inputs are validated twice before any request: Pydantic models check shape and size, and the portal, GIS and weather clients check formats (UUIDs, slugs, street addresses, City ZIP codes). Errors are sanitized.
+- Summaries are capped at 100,000 rows, so one question can't trigger an unbounded scan.
+- The AirNow key lives in Streamlit secrets or a local `.env` file, both excluded from git.
 - The agent treats tool results as data, not instructions, and declines to profile individuals.
 - No authentication on the endpoint, which suits public data. Hosting platforms' rate limits are the only throttle.
 
@@ -110,3 +143,7 @@ request after the hosted app has been idle can take longer while it wakes up.
    show tool results behind earlier claims and labeled them unverified.
    Recommendation: ask each evaluation question in a fresh chat, and consider
    logging tool calls.
+8. **Thin tools push work onto the agent.** Before the redesign, totals meant
+   paging through hundreds of 100-row calls. Moving counting to the server made
+   question 7 a single call. Recommendation: design MCP tools around the question
+   being asked, not around the API's endpoints.
