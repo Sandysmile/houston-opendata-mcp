@@ -24,7 +24,7 @@ can't, and why.
 | Agent questions answered correctly | 8 of 8 in Claude Desktop over MCP, on the final tools |
 | Answer-key errors the agent caught | 2 (questions 3 and 4) |
 | Second client (Streamlit app, same tools) | 8 of 8; missed summary mode until descriptions were shared |
-| Unit tests | 74 of 74 passing, locally and in CI |
+| Unit tests | 75 of 75 passing, locally and in CI |
 | Live tool calls | 70 across all 7 measured tools, with 0 errors |
 | Median tool response time | 0.15–0.58 seconds (live, uncached) |
 
@@ -48,7 +48,7 @@ tool accepts a URL from the caller.
 
 | Layer | How | Result |
 |---|---|---|
-| Unit | `uv run pytest tests/ -v`: canned portal, GIS, weather and air quality responses through a real MCP client, no network | 74 passed |
+| Unit | `uv run pytest tests/ -v`: canned portal, GIS, weather and air quality responses through a real MCP client, no network | 75 passed |
 | CI | GitHub Actions runs lint, format check and tests on every push | Passing |
 | Known answers | `scripts/run_eval.py` calls the tools against the live services and records the correct answer to each question; checked by hand | Collected for all 8 questions; 2 corrected |
 | Agent | All 8 questions asked in Claude Desktop connected to the MCP server over stdio, each in a new chat (Nov 15); scored against the known answers | 8 of 8 matched |
