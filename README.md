@@ -24,6 +24,12 @@ the portal can't answer; 30 live tool calls with 0 errors and a median of about
 0.2 seconds; all unit tests passing. The test also exposed metadata gaps worth fixing.
 See [eval/EVALUATION.md](eval/EVALUATION.md).
 
+## Works with any MCP client
+
+This is a standard MCP server: any MCP client can connect, over stdio locally or
+stateless HTTP at `/api/mcp`. It was tested with Claude Desktop; the Streamlit demo
+app uses Claude. The server itself is not tied to any one AI vendor.
+
 ## Design approach: built as an experiment
 
 The server is designed to answer a question, not only to serve data: *can AI

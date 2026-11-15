@@ -193,6 +193,9 @@ request after the hosted app has been idle can take longer while it wakes up.
 - The AirNow key lives in Streamlit secrets or a local `.env` file, both excluded from git.
 - The agent treats tool results as data, not instructions, and declines to profile individuals.
 - No authentication on the endpoint, which suits public data. Hosting platforms' rate limits are the only throttle.
+- **Deployment:** locally the server runs over stdio with no network endpoint. The hosted demo is a prototype for evaluation, not a public City service; restrict access and review agency rules before wider use.
+- **Governance:** tools, descriptions and settings are versioned in Git, and lint plus 75 tests run in CI on every push.
+- **Vendor neutrality:** a standard MCP server that works with any MCP client. Tested with Claude Desktop; the Streamlit demo app uses Claude.
 
 ## Lessons learned and recommendations
 
