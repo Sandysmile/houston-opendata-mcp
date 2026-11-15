@@ -186,10 +186,12 @@ request after the hosted app has been idle can take longer while it wakes up.
 
 ## Lessons learned and recommendations
 
-The lessons fall on two sides of an MCP service: the **data** it reads, and the
-**tools** that reach it, through their design and how they are deployed.
+The lessons fall into three layers of an MCP service, each improved separately:
+the **data sources** it reads, the **tools** that reach them, and the
+**deployment** that puts the tools in front of people, through an AI client or an
+app.
 
-### Improving the data
+### 1. Improving the data sources
 
 1. **Assign every dataset to its owner.** The top publisher is "Legacy Portal,"
    which is not a department, so "who publishes the most?" needs a caveat.
@@ -213,12 +215,19 @@ The lessons fall on two sides of an MCP service: the **data** it reads, and the
    missed the library inventory, and "park" matched only parking data.
    Recommendation: give featured datasets clear titles and tags.
 
-### Improving the tools: design
+### 2. Improving the tools
 
-8. **Build tools around questions, not endpoints.** Before the redesign, totals
-   meant paging through hundreds of 100-row calls; summary mode made question 7 one
-   call. Recommendation: do multi-step work (newest table, counts by group) on the
-   server.
+On November 15 the tools were consolidated and reconfigured: 9 tools became 8
+(two list tools merged into `houston_browse_catalog`), `houston_get_dataset` now
+returns columns and picks the newest table, `houston_query_records` gained summary
+mode, and every input is a validated Pydantic model.
+
+8. **Consolidate tools around questions, not endpoints.** Two list tools that
+   mirrored CKAN endpoints became one catalog tool, and steps the agent used to
+   chain (search, open, describe, query) now happen inside fewer, richer tools.
+   Totals once meant paging through hundreds of 100-row calls; summary mode made
+   question 7 one call. Recommendation: do multi-step work (newest table, counts
+   by group) on the server.
 9. **Good tools help limited agents most.** The capped app answered question 4
    wrong with the old tools and right with the new ones; Claude Desktop, with no
    caps, got it right both times.
@@ -226,7 +235,10 @@ The lessons fall on two sides of an MCP service: the **data** it reads, and the
     summary mode because its tool description was one line. Recommendation: write
     descriptions around the question each mode answers, and keep one copy.
 
-### Improving the tools: deployment and testing
+### 3. Improving the deployment
+
+The same tools reach people two ways: through an AI client (Claude Desktop, over
+MCP) or through an app (the Streamlit chat, calling the tools directly).
 
 11. **The client shapes the answer.** The same tools gave short, careful answers in
     the app and longer, analytical ones in Claude Desktop. Recommendation: choose
