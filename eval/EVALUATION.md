@@ -23,11 +23,15 @@ Service and EPA AirNow. Raw output: [results.md](results.md).
 | Unit | `uv run pytest tests/ -v`: canned portal, GIS, weather and air quality responses through a real MCP client, no network | 74 passed |
 | CI | GitHub Actions runs lint, format check and tests on every push | Passing |
 | Known answers | `scripts/run_eval.py` calls the tools against the live services and records the correct answer to each question | Collected for all 8 questions |
-| Agent | The same questions asked in the Ask Houston and Ask Houston+ apps, scored against the known answers | 8 of 8 matched |
+| Agent | Questions 1–6 asked in the Streamlit chat (Nov 11); questions 7–8 asked in Claude Desktop connected to the MCP server over stdio (Nov 15); scored against the known answers | 8 of 8 matched |
 
 ## Agent questions
 
 Questions 1–5 and 7 use Ask Houston tools; questions 6 and 8 need Ask Houston+.
+Questions 1–6 were asked in the Streamlit chat, which calls the same tool functions
+directly. Questions 7–8 were asked in Claude Desktop, connected to the MCP server
+over stdio, so the tools were checked through both the web app and a standard MCP
+client.
 
 | # | Question | Known answer | Agent |
 |---|---|---|---|
