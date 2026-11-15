@@ -2,7 +2,8 @@
 
 Evaluation of Ask Houston (open data portal) and Ask Houston+ (adds City GIS
 address lookup, weather and air quality). Agent questions 1–6 were run on November
-11, 2026; the tools were redesigned and re-measured on November 15, 2026, against
+11, 2026; the tools were redesigned and re-measured, and questions 7–8 asked, on
+November 15, 2026, against
 the live City of Houston Open Data portal, City ArcGIS layers, the National Weather
 Service and EPA AirNow. Raw output: [results.md](results.md).
 
@@ -10,8 +11,7 @@ Service and EPA AirNow. Raw output: [results.md](results.md).
 
 | Measure | Result |
 |---|---|
-| Agent questions answered correctly | 6 of 6 (questions 1–6) |
-| Known answers collected | 8 of 8, including server-side summary and weather + air quality |
+| Agent questions answered correctly | 8 of 8, including server-side summary and weather + air quality |
 | Unit tests | 74 of 74 passing, locally and in CI |
 | Live tool calls | 70 across all 7 measured tools, with 0 errors |
 | Median tool response time | 0.15–0.58 seconds (live, uncached) |
@@ -23,7 +23,7 @@ Service and EPA AirNow. Raw output: [results.md](results.md).
 | Unit | `uv run pytest tests/ -v`: canned portal, GIS, weather and air quality responses through a real MCP client, no network | 74 passed |
 | CI | GitHub Actions runs lint, format check and tests on every push | Passing |
 | Known answers | `scripts/run_eval.py` calls the tools against the live services and records the correct answer to each question | Collected for all 8 questions |
-| Agent | The same questions asked in the Ask Houston and Ask Houston+ apps, scored against the known answers | 6 of 6 matched |
+| Agent | The same questions asked in the Ask Houston and Ask Houston+ apps, scored against the known answers | 8 of 8 matched |
 
 ## Agent questions
 
@@ -37,8 +37,8 @@ Questions 1–5 and 7 use Ask Houston tools; questions 6 and 8 need Ask Houston+
 | 4 | Which budget year is the newest on the portal? | 2013, from dataset titles | Matched |
 | 5 | What is the average commute time of City of Houston employees? | Not on the portal | Said the portal doesn't hold it; invented no number |
 | 6 | What council district and super neighborhood is 901 Bagby St in? | District I (record dated 2024); Downtown, super neighborhood 61 | Matched |
-| 7 | Which three departments have the most employees on the newest payroll? | Police (7,759), Fire (5,402), Houston Public Works (4,751); all 26,220 rows read on the server | Known answer collected Nov 15 |
-| 8 | Is it a good time to be outside in 77002? | Nov 15, 9:35 a.m.: showers and thunderstorms, 60°F, 88% rain, no alerts; AQI 55 (Moderate) | Known answer collected Nov 15; changes hourly |
+| 7 | Which three departments have the most employees on the newest payroll? | Police (7,759), Fire (5,402), Houston Public Works (4,751); all 26,220 rows read on the server | Matched; also counted Active-only staff and checked no other department could outrank Public Works |
+| 8 | Is it a good time to be outside in 77002? | Nov 15, 9:35 a.m.: showers and thunderstorms, 60°F, 88% rain, no alerts; AQI 55 (Moderate) | Matched; led with the forecast, noted readings cover the whole region, suggested Monday instead |
 
 ## Comparison question: a new resident
 
