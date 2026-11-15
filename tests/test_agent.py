@@ -63,3 +63,28 @@ def test_tool_loop_stops_at_the_limit():
     replies = [tool_use("not_a_tool", {})] * agent.MAX_TOOL_ROUNDS
     answer = agent.ask(FakeClient(replies), [{"role": "user", "content": "Loop"}])
     assert "too many lookups" in answer
+
+
+def test_agent_summary_uses_the_server_side_summary(monkeypatch):
+    seen = {}
+
+    async def fake_summary(resource_id, count_by, sum_of, text, filters, top):
+        seen.update(count_by=count_by, sum_of=sum_of, top=top)
+        return {"groups": []}
+
+    monkeypatch.setattr(portal, "summarize_records", fake_summary)
+    agent.run_tool(
+        "houston_query_records",
+        {"resource_id": "x", "summary": {"count_by": "DEPT", "sum_of": "PAY"}},
+    )
+    assert seen == {"count_by": "DEPT", "sum_of": "PAY", "top": 25}
+
+
+def test_agent_rejects_an_invalid_summary_with_a_message():
+    output = json.loads(
+        agent.run_tool(
+            "houston_query_records",
+            {"resource_id": "x", "summary": {"count_by": "DEPT", "top": 0}},
+        )
+    )
+    assert output["error"] == "Invalid tool input."

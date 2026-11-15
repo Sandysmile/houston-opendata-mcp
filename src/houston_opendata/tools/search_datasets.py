@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
 from fastmcp import FastMCP
 
 from houston_opendata import portal
-from houston_opendata.models import PaginationParams
+from houston_opendata.models import CatalogName, PaginationParams, SearchText
 
 
 def register(mcp: FastMCP) -> None:
@@ -22,16 +22,13 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def houston_search_datasets(
-        query: Annotated[
-            str, "Keywords, such as 'council district'. Empty lists everything."
-        ] = "",
-        organization: Annotated[
-            str | None, "Organization `name` from houston_list_organizations."
-        ] = None,
-        group: Annotated[str | None, "Group `name` from houston_list_groups."] = None,
+        query: SearchText = "",
+        organization: CatalogName | None = None,
+        group: CatalogName | None = None,
         pagination: PaginationParams | None = None,
     ) -> dict[str, Any]:
-        """Search City of Houston open datasets by keyword, department, or topic.
+        """Find City of Houston open datasets on a subject, by keyword, department
+        (`organization`), or topic (`group`).
 
         Start here. Each result's `metadata_modified` shows when its catalog entry
         last changed; update frequency varies by dataset. Results include

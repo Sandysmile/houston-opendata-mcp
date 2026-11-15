@@ -21,27 +21,30 @@ specific to your address (Ask Houston+).
 
 **Evaluation (November 2026):** 6 of 6 known-answer questions correct, including one
 the portal can't answer; 30 live tool calls with 0 errors and a median of about
-0.2 seconds; 52 unit tests passing. The test also exposed metadata gaps worth fixing.
+0.2 seconds; all unit tests passing. The test also exposed metadata gaps worth fixing.
 See [eval/EVALUATION.md](eval/EVALUATION.md).
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `houston_search_datasets` | Search the catalog by keyword, department, or topic |
-| `houston_get_dataset` | Open a dataset and list its resources |
-| `houston_describe_table` | List a table's columns and row count |
-| `houston_query_records` | Read rows with filters, sorting, and paging |
-| `houston_list_organizations` | List departments and their dataset counts |
-| `houston_list_groups` | List topic groups and their dataset counts |
+Each tool answers a question a person or agent actually asks, rather than mirroring
+one portal endpoint. Inputs are validated with Pydantic models (`models.py`); bad
+values in the right shape come back with a fix-it `hint`.
+
+| Tool | Question it answers | What it combines |
+|---|---|---|
+| `houston_search_datasets` | Is there data on this subject? | Keyword, department and topic filters in one search |
+| `houston_browse_catalog` | What does the portal cover, and who publishes the most? | Department and topic listings, paged past the portal's 25-item cap, ranked |
+| `houston_get_dataset` | What's in this dataset, and which table should I query? | Dataset metadata + column lists and row counts for up to 6 tables, read in parallel; picks the newest table |
+| `houston_describe_table` | How are values written in this table? | Columns, row count and sample rows, so exact-match filters work |
+| `houston_query_records` | Which records match? How many, or how much, by group? | Rows mode, or summary mode: counts, sums and averages over up to 100,000 rows, computed on the server |
 
 With `USE_ARCGIS=true`, the server adds three more tools:
 
-| Tool | What it does |
+| Tool | Question it answers |
 |---|---|
-| `houston_lookup_address` | Find an address's city limits, council district, and super neighborhood, using City GIS layers on ArcGIS Online |
-| `houston_weather_forecast` | Weather forecast and active alerts for a Houston ZIP code, from the National Weather Service (no key needed) |
-| `houston_air_quality` | Current air quality and forecast for a Houston ZIP code, from EPA AirNow (needs `AIRNOW_API_KEY`) |
+| `houston_lookup_address` | Who represents me, and what neighborhood am I in? Matches the address to City address points, then checks city limits, council district and super neighborhood layers in parallel: one call instead of five GIS queries |
+| `houston_weather_forecast` | Should I plan around the weather? NWS forecast plus active alerts (such as flood warnings), joined to the City's own ZIP list (no key needed) |
+| `houston_air_quality` | Is the air healthy right now? EPA AirNow current reading and forecast, joined to the City's ZIP list (needs `AIRNOW_API_KEY`) |
 
 Both ZIP code tools use `src/houston_opendata/data/houston_zip_centroids.csv`: the 118
 ZIP codes fully or partially within the City (from the open data portal), each with a

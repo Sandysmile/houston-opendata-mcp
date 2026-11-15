@@ -8,7 +8,7 @@ It calls the real tools against the live portal and City GIS layers, then writes
 eval/results.md with:
 
   1. Known answers for the agent questions, with portal links to confirm by hand.
-  2. Response times for the main tools over 10 calls each.
+  2. Response times for every tool over 10 calls each.
 
 It does not call an AI model. Ask the agent questions yourself in the app and
 compare its answers with eval/results.md.
@@ -34,6 +34,7 @@ from houston_opendata.app import mcp  # noqa: E402
 
 RUNS = 10
 TEST_ADDRESS = "901 Bagby St"  # Houston City Hall, a public building
+TEST_ZIP = "77002"  # Downtown
 OUT = Path("eval/results.md")
 
 
@@ -68,13 +69,16 @@ def years_in(text: str) -> list[int]:
     return [int(y) for y in re.findall(r"(?:FY\s?)?(20\d{2})", text or "")]
 
 
-async def known_answers(client: Client) -> tuple[list[str], str | None]:
+async def known_answers(
+    client: Client,
+) -> tuple[list[str], str | None, str | None]:
     lines: list[str] = []
     payroll_resource = None
+    payroll_columns: list[str] = []
+    payroll_name = None
 
     # Q1. Department with the most datasets
-    orgs = (await call(client, "houston_list_organizations")).get("organizations", [])
-    orgs = sorted(orgs, key=lambda o: o.get("dataset_count") or 0, reverse=True)
+    orgs = (await call(client, "houston_browse_catalog")).get("departments", [])
     top = ", ".join(f"{o['title']} ({o['dataset_count']})" for o in orgs[:3])
     lines.append(f"| 1 | Which department publishes the most datasets? | {top} |")
 
@@ -91,23 +95,21 @@ async def known_answers(client: Client) -> tuple[list[str], str | None]:
     )
     answer = "No Payroll dataset found"
     if payroll:
-        dataset = await call(
-            client, "houston_get_dataset", {"dataset": payroll[0]["name"]}
+        payroll_name = payroll[0]["name"]
+        dataset = await call(client, "houston_get_dataset", {"dataset": payroll_name})
+        # One call: get_dataset picks the newest table and lists its columns.
+        newest = dataset.get("newest_queryable_resource") or {}
+        table = next(
+            (r for r in dataset.get("resources", []) if r["id"] == newest.get("id")),
+            None,
         )
-        tables = sorted(
-            (r for r in dataset.get("resources", []) if r.get("queryable")),
-            key=lambda r: r.get("last_modified") or "",
-            reverse=True,
-        )
-        if tables:
-            payroll_resource = tables[0]["id"]
-            table = await call(
-                client, "houston_describe_table", {"resource_id": payroll_resource}
-            )
-            columns = ", ".join(c["name"] for c in table.get("columns", []))
+        if table:
+            payroll_resource = table["id"]
+            payroll_columns = [c["name"] for c in table.get("columns") or []]
             answer = (
-                f"[{tables[0].get('name')}]({tables[0].get('portal_url')}): "
-                f"{table.get('total_records')} rows; columns: {columns}"
+                f"[{table.get('name')}]({table.get('portal_url')}), chosen by "
+                f"{newest.get('chosen_by')}: {table.get('total_records')} rows; "
+                f"columns: {', '.join(payroll_columns)}"
             )
     lines.append(
         f"| 2 | What columns does the most recent Payroll table have, and how many "
@@ -163,22 +165,78 @@ async def known_answers(client: Client) -> tuple[list[str], str | None]:
         f"| 6 (Ask Houston+) | What council district and super neighborhood is "
         f"{TEST_ADDRESS} in? | {answer} |"
     )
-    return lines, payroll_resource
+
+    # Q7. Summary mode: a count by group, computed on the server
+    department = next(
+        (c for c in payroll_columns if "DEP" in c.upper() or "DIV" in c.upper()),
+        None,
+    )
+    if payroll_resource and department:
+        summary = await call(
+            client,
+            "houston_query_records",
+            {
+                "resource_id": payroll_resource,
+                "summary": {"count_by": department, "top": 3},
+            },
+        )
+        top3 = ", ".join(
+            f"{g['value']} ({g['count']:,})" for g in summary.get("groups", [])
+        )
+        answer = (
+            f"{top3}; {summary.get('rows_read'):,} of "
+            f"{summary.get('rows_matched'):,} rows read, complete: "
+            f"{summary.get('complete')}"
+        )
+    else:
+        answer = "Payroll table or department column not found"
+    lines.append(
+        "| 7 | Which three departments have the most employees on the newest "
+        f"payroll? | {answer} |"
+    )
+
+    # Q8. Ask Houston+: weather and air quality together
+    weather = await call(client, "houston_weather_forecast", {"zip_code": TEST_ZIP})
+    air = await call(client, "houston_air_quality", {"zip_code": TEST_ZIP})
+    first = (weather.get("periods") or [{}])[0]
+    alerts = [a.get("event") for a in weather.get("active_alerts") or []]
+    now = (air.get("current") or [{}])[0]
+    answer = (
+        f"{first.get('name')}: {first.get('summary')}, {first.get('temperature')}"
+        f"°{first.get('temperature_unit')}, rain {first.get('chance_of_rain_percent')}"
+        f"%; alerts: {', '.join(a for a in alerts if a) or 'none'}; AQI "
+        f"{now.get('aqi')} ({now.get('category')}). Changes hourly: compare with "
+        "the agent's answer at the same time."
+        if "error" not in weather
+        else f"Weather error: {weather.get('error')}"
+    )
+    lines.append(
+        f"| 8 (Ask Houston+) | Is it a good time to be outside in {TEST_ZIP}? | "
+        f"{answer} |"
+    )
+    return lines, payroll_resource, payroll_name
 
 
 async def main() -> None:
     async with Client(mcp) as client:
         print("Collecting known answers...")
-        answers, payroll_resource = await known_answers(client)
+        answers, payroll_resource, payroll_name = await known_answers(client)
 
         print(f"Timing tools ({RUNS} calls each)...")
         perf = [
             await timed(client, "houston_search_datasets", {"query": "budget"}),
+            await timed(client, "houston_browse_catalog", {}),
             await timed(client, "houston_lookup_address", {"address": TEST_ADDRESS}),
+            await timed(client, "houston_weather_forecast", {"zip_code": TEST_ZIP}),
+            await timed(client, "houston_air_quality", {"zip_code": TEST_ZIP}),
         ]
+        if payroll_name:
+            perf.insert(
+                2, await timed(client, "houston_get_dataset", {"dataset": payroll_name})
+            )
         if payroll_resource:
             perf.insert(
-                1,
+                3,
                 await timed(
                     client,
                     "houston_query_records",

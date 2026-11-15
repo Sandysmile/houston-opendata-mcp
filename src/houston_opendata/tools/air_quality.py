@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
 from fastmcp import FastMCP
 
 from houston_opendata import conditions, portal
+from houston_opendata.models import ZipCode
 
 
 def register(mcp: FastMCP) -> None:
@@ -21,9 +22,7 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def houston_air_quality(
-        zip_code: Annotated[
-            str | None, "Houston ZIP code, such as 77002. Omit for downtown."
-        ] = None,
+        zip_code: ZipCode | None = None,
     ) -> dict[str, Any]:
         """Get current air quality (AQI) and the air quality forecast from EPA
         AirNow for a ZIP code in the City of Houston.

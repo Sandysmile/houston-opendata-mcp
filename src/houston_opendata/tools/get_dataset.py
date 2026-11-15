@@ -1,12 +1,13 @@
-"""Tool: fetch one dataset's metadata and resources."""
+"""Tool: open one dataset — its metadata, resources, and their columns."""
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
 from fastmcp import FastMCP
 
 from houston_opendata import portal
+from houston_opendata.models import DatasetRef
 
 
 def register(mcp: FastMCP) -> None:
@@ -20,15 +21,15 @@ def register(mcp: FastMCP) -> None:
             "openWorldHint": True,
         },
     )
-    async def houston_get_dataset(
-        dataset: Annotated[str, "Dataset `name` or `id` from a search result."],
-    ) -> dict[str, Any]:
-        """Get a dataset's description, owner, license, and resources.
+    async def houston_get_dataset(dataset: DatasetRef) -> dict[str, Any]:
+        """Open a dataset: who publishes it, how current it is, its resources, and
+        the columns and row count of each queryable resource.
 
-        A dataset can hold several resources (for example one per year). Each
-        resource reports `queryable`: when true, use its `id` with
-        houston_describe_table and houston_query_records; when false, use its
-        `download_url`. `last_modified` gives the resource's as-of date.
+        Answers "what's in this dataset and which table should I query?" in one
+        call. `newest_queryable_resource` picks the latest table (for example
+        Payroll 2026 out of yearly tables), so "most recent" questions need no
+        guessing. Resources with queryable=true go straight to
+        houston_query_records; others are reachable through `download_url`.
         """
         try:
             return await portal.get_dataset(dataset)

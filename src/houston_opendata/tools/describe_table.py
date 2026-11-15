@@ -1,12 +1,13 @@
-"""Tool: list a queryable resource's columns."""
+"""Tool: show a table's columns and how its values are written."""
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
 from fastmcp import FastMCP
 
 from houston_opendata import portal
+from houston_opendata.models import ResourceId
 
 
 def register(mcp: FastMCP) -> None:
@@ -20,13 +21,13 @@ def register(mcp: FastMCP) -> None:
             "openWorldHint": True,
         },
     )
-    async def houston_describe_table(
-        resource_id: Annotated[str, "Resource `id` (UUID) from houston_get_dataset."],
-    ) -> dict[str, Any]:
-        """List a queryable resource's columns, types, and total row count.
+    async def houston_describe_table(resource_id: ResourceId) -> dict[str, Any]:
+        """Show a table's columns, types, row count, and three sample rows.
 
-        Call this before houston_query_records so that filters, column lists, and
-        sorting use real column names. Only works when `queryable` is true.
+        Use before filtering when you need to see how values are written, since
+        filters match exactly (is it "HITS" or "Houston IT"? "K" or "District
+        K"?). houston_get_dataset already lists columns for the newest tables, so
+        call this mainly for older tables or to check value formats.
         """
         try:
             return await portal.describe_table(resource_id)

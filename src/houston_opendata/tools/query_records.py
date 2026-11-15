@@ -1,13 +1,20 @@
-"""Tool: read rows from a queryable resource."""
+"""Tool: answer "which records" and "how many, by what" questions on a table."""
 
 from __future__ import annotations
 
 from typing import Annotated, Any
 
 from fastmcp import FastMCP
+from pydantic import Field
 
 from houston_opendata import portal
-from houston_opendata.models import PaginationParams
+from houston_opendata.models import (
+    ColumnList,
+    PaginationParams,
+    RecordFilters,
+    ResourceId,
+    SummaryParams,
+)
 
 
 def register(mcp: FastMCP) -> None:
@@ -22,31 +29,42 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def houston_query_records(
-        resource_id: Annotated[str, "Resource `id` (UUID) from houston_get_dataset."],
+        resource_id: ResourceId,
         text: Annotated[
-            str | None, "Full-text search across all columns in the table."
+            str | None,
+            Field(max_length=200, description="Full-text search across all columns."),
         ] = None,
-        filters: Annotated[
-            dict[str, Any] | None,
-            'Exact matches by column, such as {"COUNCIL_DISTRICT": "K"}.',
-        ] = None,
-        columns: Annotated[
-            list[str] | None, "Columns to return. Omit to return all of them."
-        ] = None,
+        filters: RecordFilters | None = None,
+        summary: SummaryParams | None = None,
+        columns: ColumnList | None = None,
         sort: Annotated[
-            str | None, 'Column and direction, such as "YEAR desc".'
+            str | None,
+            Field(max_length=100, description='Column and direction, "YEAR desc".'),
         ] = None,
         pagination: PaginationParams | None = None,
     ) -> dict[str, Any]:
-        """Read rows from a queryable resource, with filters and pagination.
+        """Answer questions about a table's records, in one of two modes.
 
-        Returns at most 100 rows per call. Use `total` to count matches without
-        paging through them, for example with a limit of 1. There is no server-side
-        aggregation, so for sums or averages over many rows, page through
-        `next_offset`. Very long text values are truncated.
+        Rows: "which records match?" Returns up to 100 matching rows per call
+        with `total`, filters, sorting and paging.
+
+        Summary: "how many, or how much, by what?" Pass `summary` with `count_by`
+        (and optionally `sum_of`) to get counts, sums and averages per group,
+        such as employees and average salary by department. The server reads up
+        to 100,000 matching rows itself, so don't page through rows to add them
+        up. `columns`, `sort` and `pagination` are ignored in summary mode.
         """
-        page = pagination or PaginationParams()
         try:
+            if summary:
+                return await portal.summarize_records(
+                    resource_id,
+                    summary.count_by,
+                    summary.sum_of,
+                    text,
+                    filters,
+                    summary.top,
+                )
+            page = pagination or PaginationParams()
             return await portal.query_records(
                 resource_id, text, filters, columns, sort, page.limit, page.offset
             )

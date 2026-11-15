@@ -33,6 +33,8 @@ def register(mcp: FastMCP) -> None:
         return (
             f"Compare {topic} across Houston by {geography}. Read the join keys "
             "resource, find datasets carrying that key, and confirm the column "
-            "exists before querying. If a dataset lacks the key, say so and do not "
-            "estimate. Show the numbers and link to the source datasets."
+            "exists before querying. Use houston_query_records with `summary` "
+            "(count_by the geography column) to get the counts. If a dataset lacks "
+            "the key, say so and do not estimate. Show the numbers and link to the "
+            "source datasets."
         )

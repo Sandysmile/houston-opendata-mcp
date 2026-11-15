@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Any
 
 from fastmcp import FastMCP
 
 from houston_opendata import gis, portal
+from houston_opendata.models import StreetAddress
 
 
 def register(mcp: FastMCP) -> None:
@@ -21,12 +22,16 @@ def register(mcp: FastMCP) -> None:
         },
     )
     async def houston_lookup_address(
-        address: Annotated[str, "Street address, such as 901 Bagby St."],
+        address: StreetAddress,
     ) -> dict[str, Any]:
-        """Find a street address in the City's address points, then report whether
-        it is inside city limits, its council district, and its super neighborhood.
+        """Answer "who represents me, and what neighborhood am I in?" for a street
+        address: whether it is inside city limits, its council district, and its
+        super neighborhood.
 
-        Uses City of Houston GIS layers on ArcGIS Online. Use this whenever a
+        Matches the address against the City's official address points, then
+        checks the point against three City boundary layers in parallel, so one
+        call replaces five GIS queries. Uses City of Houston GIS layers on ArcGIS
+        Online. Use this whenever a
         question gives a street address; a ZIP code alone can cross district lines.
         """
         try:

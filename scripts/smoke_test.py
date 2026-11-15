@@ -17,8 +17,7 @@ EXPECTED_TOOLS = {
     "houston_get_dataset",
     "houston_describe_table",
     "houston_query_records",
-    "houston_list_organizations",
-    "houston_list_groups",
+    "houston_browse_catalog",
 }
 
 

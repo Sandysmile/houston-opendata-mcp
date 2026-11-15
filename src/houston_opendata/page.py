@@ -26,12 +26,11 @@ PLUS_EXAMPLES = (
 GIS_HUB_URL = "https://houston-mycity.opendata.arcgis.com"
 
 TOOLS = [
-    ("houston_search_datasets", "Search the catalog by keyword, department, or topic"),
-    ("houston_get_dataset", "Open a dataset and list its resources"),
-    ("houston_describe_table", "List a table's columns and row count"),
-    ("houston_query_records", "Read rows with filters, sorting, and paging"),
-    ("houston_list_organizations", "List departments and their dataset counts"),
-    ("houston_list_groups", "List topic groups and their dataset counts"),
+    ("houston_search_datasets", "Find datasets by keyword, department, or topic"),
+    ("houston_browse_catalog", "See which departments and topics have data"),
+    ("houston_get_dataset", "Open a dataset, its tables, and their columns"),
+    ("houston_describe_table", "See a table's columns and sample values"),
+    ("houston_query_records", "Find records, or count and total them by group"),
 ]
 PLUS_TOOLS = [
     (
