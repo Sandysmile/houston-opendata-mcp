@@ -201,6 +201,8 @@ the **data sources** it reads, the **tools** that reach them, and the
 **deployment** that puts the tools in front of people, through an AI client or an
 app.
 
+**MCP design matters.** The data sources are what the server points to; the tools and the deployment are design choices, and those choices decided how well the same AI used the same data.
+
 ### 1. Improving the data sources
 
 1. **Assign every dataset to its owner.** The top publisher is "Legacy Portal,"
