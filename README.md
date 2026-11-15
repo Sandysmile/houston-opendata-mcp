@@ -41,7 +41,7 @@ actually use our open data, and where does it fail?*
 The evaluation found problems in three layers, data sources, tools and deployment,
 and each became a recommendation for the City's open data program.
 
-**Data sources and MCP design both matter.** The data sources decide what the AI can know; the tools and the deployment are design choices that decide how well it uses that data.
+**Data sources, MCP design and deployment all matter.** The data sources decide what the AI can know; the design of the tools and the choice of deployment decide how well it uses that data.
 
 ## Tools
 
