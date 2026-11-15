@@ -8,11 +8,13 @@ from fastmcp import FastMCP
 
 from houston_opendata import conditions, portal
 from houston_opendata.models import ZipCode
+from houston_opendata.tool_docs import TOOL_DESCRIPTIONS
 
 
 def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="houston_air_quality",
+        description=TOOL_DESCRIPTIONS["houston_air_quality"],
         annotations={
             "title": "Houston air quality",
             "readOnlyHint": True,
@@ -24,13 +26,6 @@ def register(mcp: FastMCP) -> None:
     async def houston_air_quality(
         zip_code: ZipCode | None = None,
     ) -> dict[str, Any]:
-        """Get current air quality (AQI) and the air quality forecast from EPA
-        AirNow for a ZIP code in the City of Houston.
-
-        Use for questions about air quality, ozone, smog, or whether it's healthy
-        to be outside. AirNow reports by area, and most Houston ZIP codes share
-        one reporting area, so readings are citywide, not neighborhood-level.
-        """
         try:
             return await conditions.air_quality(zip_code)
         except portal.PortalError as exc:

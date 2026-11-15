@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 from houston_opendata import conditions, gis, portal
 from houston_opendata.config import settings
 from houston_opendata.models import SummaryParams
+from houston_opendata.tool_docs import TOOL_DESCRIPTIONS
 
 MAX_TOOL_ROUNDS = 6
 MAX_TOKENS = 1500
@@ -75,8 +76,7 @@ _RESOURCE_ID = _string("Resource id (UUID) from houston_get_dataset.")
 TOOLS: list[dict[str, Any]] = [
     {
         "name": "houston_search_datasets",
-        "description": "Find datasets on a subject by keyword, department, or "
-        "topic. Start here.",
+        "description": "",  # filled from tool_docs below
         "input_schema": {
             "type": "object",
             "properties": {
@@ -89,9 +89,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "houston_get_dataset",
-        "description": "Open a dataset: publisher, currency, resources, and the "
-        "columns and row count of each queryable table. newest_queryable_resource "
-        "picks the latest table.",
+        "description": "",  # filled from tool_docs below
         "input_schema": {
             "type": "object",
             "properties": {"dataset": _string("Dataset name or id.")},
@@ -100,8 +98,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "houston_describe_table",
-        "description": "A table's columns, row count, and three sample rows, to "
-        "see how values are written before filtering.",
+        "description": "",  # filled from tool_docs below
         "input_schema": {
             "type": "object",
             "properties": {"resource_id": _RESOURCE_ID},
@@ -110,8 +107,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "houston_query_records",
-        "description": "Read matching rows (with `total`), or pass `summary` to "
-        "get counts, sums and averages per group computed over up to 100,000 rows.",
+        "description": "",  # filled from tool_docs below
         "input_schema": {
             "type": "object",
             "properties": {
@@ -129,7 +125,9 @@ TOOLS: list[dict[str, Any]] = [
                 "sort": _string('For example, "YEAR desc".'),
                 "summary": {
                     "type": "object",
-                    "description": "Group and count instead of returning rows.",
+                    "description": "For how many / how much by group: counts, sums "
+                    "and averages over up to 100,000 rows, computed on the server. "
+                    "Use this instead of paging through rows.",
                     "properties": {
                         "count_by": _string("Column to group by."),
                         "sum_of": _string("Optional numeric column to total."),
@@ -144,8 +142,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "houston_browse_catalog",
-        "description": "Departments and topics on the portal with dataset counts, "
-        "largest first.",
+        "description": "",  # filled from tool_docs below
         "input_schema": {
             "type": "object",
             "properties": {
@@ -160,9 +157,7 @@ TOOLS: list[dict[str, Any]] = [
 
 ADDRESS_TOOL: dict[str, Any] = {
     "name": "houston_lookup_address",
-    "description": "Look up a Houston street address in the City's GIS layers. "
-    "Returns whether it is inside city limits, its council district, and its "
-    "super neighborhood.",
+    "description": "",  # filled from tool_docs below
     "input_schema": {
         "type": "object",
         "properties": {"address": _string("Street address, such as 901 Bagby St.")},
@@ -175,8 +170,7 @@ _ZIP = _string("Houston ZIP code, such as 77002. Omit for downtown.")
 
 WEATHER_TOOL: dict[str, Any] = {
     "name": "houston_weather_forecast",
-    "description": "National Weather Service forecast and active weather alerts "
-    "(such as flood warnings) for a ZIP code in the City of Houston.",
+    "description": "",  # filled from tool_docs below
     "input_schema": {
         "type": "object",
         "properties": {
@@ -192,12 +186,16 @@ WEATHER_TOOL: dict[str, Any] = {
 
 AIR_TOOL: dict[str, Any] = {
     "name": "houston_air_quality",
-    "description": "Current air quality (AQI) and the air quality forecast from EPA "
-    "AirNow for a ZIP code in the City of Houston. Readings are citywide.",
+    "description": "",  # filled from tool_docs below
     "input_schema": {"type": "object", "properties": {"zip_code": _ZIP}},
 }
 
 PLUS_TOOLS = [ADDRESS_TOOL, WEATHER_TOOL, AIR_TOOL]
+
+# Use the MCP server's descriptions, so the app and Claude Desktop describe each
+# tool the same way. (The app once missed summary mode with shorter copies.)
+for _tool in TOOLS + PLUS_TOOLS:
+    _tool["description"] = TOOL_DESCRIPTIONS[_tool["name"]]
 
 
 def tools(use_arcgis: bool = False) -> list[dict[str, Any]]:

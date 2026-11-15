@@ -15,11 +15,13 @@ from houston_opendata.models import (
     ResourceId,
     SummaryParams,
 )
+from houston_opendata.tool_docs import TOOL_DESCRIPTIONS
 
 
 def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="houston_query_records",
+        description=TOOL_DESCRIPTIONS["houston_query_records"],
         annotations={
             "title": "Query Houston records",
             "readOnlyHint": True,
@@ -43,17 +45,6 @@ def register(mcp: FastMCP) -> None:
         ] = None,
         pagination: PaginationParams | None = None,
     ) -> dict[str, Any]:
-        """Answer questions about a table's records, in one of two modes.
-
-        Rows: "which records match?" Returns up to 100 matching rows per call
-        with `total`, filters, sorting and paging.
-
-        Summary: "how many, or how much, by what?" Pass `summary` with `count_by`
-        (and optionally `sum_of`) to get counts, sums and averages per group,
-        such as employees and average salary by department. The server reads up
-        to 100,000 matching rows itself, so don't page through rows to add them
-        up. `columns`, `sort` and `pagination` are ignored in summary mode.
-        """
         try:
             if summary:
                 return await portal.summarize_records(
