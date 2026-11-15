@@ -205,6 +205,9 @@ app.
 
 ### 1. Improving the data sources
 
+Improving data sources means two things: fixing the data already published, and
+selecting and connecting the sources that make answers local.
+
 1. **Assign every dataset to its owner.** The top publisher is "Legacy Portal,"
    which is not a department, so "who publishes the most?" needs a caveat.
    Recommendation: assign every dataset to its owning department.
@@ -220,9 +223,14 @@ app.
 5. **Make metadata agree with itself.** "Houston Libraries" carries a 2026 update
    date but says "Updated Aug 2023" in its description, and the council district
    layer is dated 2024. Recommendation: check descriptions and dates at each refresh.
-6. **Publish boundary layers next to the catalog.** ZIP codes cross district lines,
-   so address questions need the City's GIS layers. Recommendation: expose
-   authoritative boundary layers alongside open data.
+6. **Select and connect the sources that make answers local.** Four selected City
+   GIS layers (site addresses, city limits, council districts and super
+   neighborhoods) placed an address in its district and neighborhood. National
+   Weather Service forecasts and EPA AirNow readings became Houston answers through
+   the City's own list of 118 ZIP codes, hosted on the open data portal. ZIP codes
+   cross district lines, so address questions need the GIS layers too.
+   Recommendation: publish authoritative boundary layers and keyed reference
+   tables, such as the ZIP code list, next to the catalog.
 7. **Name datasets the way people ask.** One run of the new-resident question
    missed the library inventory, and "park" matched only parking data.
    Recommendation: give featured datasets clear titles and tags.
