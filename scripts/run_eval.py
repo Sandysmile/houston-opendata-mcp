@@ -30,6 +30,7 @@ os.environ["USE_ARCGIS"] = "true"
 
 from fastmcp import Client  # noqa: E402
 
+from houston_opendata import conditions  # noqa: E402
 from houston_opendata.app import mcp  # noqa: E402
 
 RUNS = 10
@@ -63,6 +64,15 @@ async def timed(client: Client, tool: str, args: dict) -> dict[str, Any]:
         "max": max(times),
         "errors": errors,
     }
+
+
+async def timed_uncached(client: Client, tool: str, args: dict) -> dict[str, Any]:
+    """Like timed(), but clear the weather and air cache first, so the first call
+    measures the live services and the rest measure the server's cache."""
+    conditions._cache.clear()
+    result = await timed(client, tool, args)
+    result["tool"] += " *"
+    return result
 
 
 def years_in(text: str) -> list[int]:
@@ -167,9 +177,11 @@ async def known_answers(
     )
 
     # Q7. Summary mode: a count by group, computed on the server
+    # Prefer a department name column over a numeric department ID.
+    candidates = [c for c in payroll_columns if "DEP" in c.upper()]
     department = next(
-        (c for c in payroll_columns if "DEP" in c.upper() or "DIV" in c.upper()),
-        None,
+        (c for c in candidates if "NAME" in c.upper()),
+        candidates[0] if candidates else None,
     )
     if payroll_resource and department:
         summary = await call(
@@ -201,12 +213,16 @@ async def known_answers(
     first = (weather.get("periods") or [{}])[0]
     alerts = [a.get("event") for a in weather.get("active_alerts") or []]
     now = (air.get("current") or [{}])[0]
+    air_text = (
+        f"AQI {now.get('aqi')} ({now.get('category')})"
+        if "error" not in air
+        else f"air quality error: {air.get('error')} {air.get('hint', '')}"
+    )
     answer = (
         f"{first.get('name')}: {first.get('summary')}, {first.get('temperature')}"
         f"°{first.get('temperature_unit')}, rain {first.get('chance_of_rain_percent')}"
-        f"%; alerts: {', '.join(a for a in alerts if a) or 'none'}; AQI "
-        f"{now.get('aqi')} ({now.get('category')}). Changes hourly: compare with "
-        "the agent's answer at the same time."
+        f"%; alerts: {', '.join(a for a in alerts if a) or 'none'}; {air_text}. "
+        "Changes hourly: compare with the agent's answer at the same time."
         if "error" not in weather
         else f"Weather error: {weather.get('error')}"
     )
@@ -227,8 +243,10 @@ async def main() -> None:
             await timed(client, "houston_search_datasets", {"query": "budget"}),
             await timed(client, "houston_browse_catalog", {}),
             await timed(client, "houston_lookup_address", {"address": TEST_ADDRESS}),
-            await timed(client, "houston_weather_forecast", {"zip_code": TEST_ZIP}),
-            await timed(client, "houston_air_quality", {"zip_code": TEST_ZIP}),
+            await timed_uncached(
+                client, "houston_weather_forecast", {"zip_code": TEST_ZIP}
+            ),
+            await timed_uncached(client, "houston_air_quality", {"zip_code": TEST_ZIP}),
         ]
         if payroll_name:
             perf.insert(
@@ -270,6 +288,10 @@ async def main() -> None:
             "| Tool | First call | Median | Slowest | Errors |",
             "|---|---|---|---|---|",
             *rows,
+            "",
+            "\\* Weather and air quality responses are cached briefly on the "
+            "server, so the first call measures the live National Weather Service "
+            "and AirNow, and later calls measure the cache.",
             "",
         ]
     )
