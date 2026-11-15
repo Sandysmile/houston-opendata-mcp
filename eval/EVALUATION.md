@@ -13,9 +13,26 @@ over stdio. Raw output: [results.md](results.md).
 |---|---|
 | Agent questions answered correctly | 8 of 8 in Claude Desktop over MCP, on the final tools |
 | Answer-key errors the agent caught | 2 (questions 3 and 4) |
+| Second client (Streamlit app, same tools) | 8 of 8; missed summary mode until descriptions were shared |
 | Unit tests | 74 of 74 passing, locally and in CI |
 | Live tool calls | 70 across all 7 measured tools, with 0 errors |
 | Median tool response time | 0.15–0.58 seconds (live, uncached) |
+
+## Data sources
+
+Every source is public. Addresses and layers are fixed in the server's code, so no
+tool accepts a URL from the caller.
+
+| Source | Publisher | What it provides | Tools |
+|---|---|---|---|
+| [City of Houston Open Data Portal](https://data.houstontx.gov) (CKAN) | City of Houston departments | Dataset catalog, metadata and queryable tables | search_datasets, browse_catalog, get_dataset, describe_table, query_records |
+| [COH Site Addresses](https://services.arcgis.com/NummVBqZSIJKUeVR/ArcGIS/rest/services/COH_SiteAddresses/FeatureServer/0) (ArcGIS Online) | Planning and Development | Official address points, matched to a location | lookup_address |
+| [COH City Limits](https://services.arcgis.com/NummVBqZSIJKUeVR/ArcGIS/rest/services/City_Limits_Full/FeatureServer/0) | Planning and Development | Whether a point is inside city limits (Pending areas count as outside) | lookup_address |
+| [Houston Council Districts](https://services.arcgis.com/NummVBqZSIJKUeVR/ArcGIS/rest/services/Houston_Council_Districts_view/FeatureServer/2) | City of Houston | District and council member (record dated 2024) | lookup_address |
+| [Houston Super Neighborhoods](https://services.arcgis.com/NummVBqZSIJKUeVR/ArcGIS/rest/services/Super_Neighborhoods/FeatureServer/0) | City of Houston | Super neighborhood name, number and profile link | lookup_address |
+| City ZIP code list (`houston_zip_centroids.csv`) | Open data portal (118 ZIP codes in the City) and Census Bureau 2026 ZCTA Gazetteer (center points) | Limits weather and air quality to the City and turns a ZIP code into a location | weather_forecast, air_quality |
+| [National Weather Service API](https://www.weather.gov/documentation/services-web-api) | NOAA | Forecast and active alerts | weather_forecast |
+| [EPA AirNow API](https://docs.airnowapi.org) | EPA | Current air quality and forecast by reporting area | air_quality |
 
 ## Testing methodology
 
@@ -57,6 +74,40 @@ answers were wrong. The agent caught both:
 
 An earlier round on November 11 asked questions 1–6 in the Streamlit chat with the
 first version of the tools; its "match" on question 4 agreed with the wrong key.
+
+## Two clients compared
+
+After the redesign, the same 8 questions were asked through two clients on November
+15, each question in a fresh chat. Claude Desktop connects to the MCP server over
+stdio; the Streamlit app's chat calls the same tool functions directly, with its own
+system prompt and limits (6 tool rounds, 1,500 tokens per answer, 50 rows per call).
+
+| # | Streamlit app | Claude Desktop | Difference |
+|---|---|---|---|
+| 1 | Correct | Correct | None |
+| 2 | Correct; miscounted numeric pay columns (4 of 5) | Correct; found Birth Year changed type in 2024 | Desktop more thorough |
+| 3 | Correct: 3, "a floor, not a full count" | Correct: 3, "probably low" | None |
+| 4 | Correct: FY2025, confirmed by sorting the table (said 2013 on Nov 11, old tools) | Correct: FY2025 | None now |
+| 5 | Correct; said what it didn't check | Correct; suggested other sources | None |
+| 6 | Correct | Correct; flagged the 2024 date | None |
+| 7 | Correct, but counted department by department | Correct, with summary mode | Desktop used the tool as designed |
+| 8 | Correct, with reading and forecast times | Correct | None |
+
+Both clients answered 8 of 8 correctly. They differed in how:
+
+- **Depth.** Claude Desktop explored further and found extra issues; the app, with
+  tighter limits and a "keep answers short" prompt, answered and stopped.
+- **Transparency.** The app said more about what it did *not* check and when data
+  was issued; Claude Desktop said more about what it found.
+- **Tool use.** On question 7 the app missed summary mode. It had its own one-line
+  tool descriptions, while Claude Desktop read the full ones from the MCP server.
+  Fixed the same day: both clients now read one set of descriptions
+  (`tool_docs.py`), and a unit test keeps them in step.
+- **Memory.** Claude Desktop sometimes referred to other chats; the app answered
+  each question on its own, which is easier to reproduce.
+
+Each client suits a different audience: the app for residents who want a short,
+careful answer, and Claude Desktop for analysts and data stewards.
 
 ## Comparison question: a new resident
 
@@ -135,40 +186,60 @@ request after the hosted app has been idle can take longer while it wakes up.
 
 ## Lessons learned and recommendations
 
-1. **Metadata decides answer quality.** The top publisher is listed as "Legacy
-   Portal," which is not a department, so an honest answer to "who publishes the
-   most?" is misleading. Recommendation: assign every dataset to its owning
-   department.
-2. **Tagging limits discovery.** Search finds 3 council district datasets, but at
-   least 9 carry a district column. Recommendation: tag every dataset with the
-   shared keys it contains, such as council district, super neighborhood and ZIP code.
-3. **Yearly tables hide freshness.** The newest budget, FY2025, sits inside one
+The lessons fall on two sides of an MCP service: the **data** it reads, and the
+**tools** that reach it, through their design and how they are deployed.
+
+### Improving the data
+
+1. **Assign every dataset to its owner.** The top publisher is "Legacy Portal,"
+   which is not a department, so "who publishes the most?" needs a caveat.
+   Recommendation: assign every dataset to its owning department.
+2. **Tag the shared keys a dataset contains.** Search finds 3 council district
+   datasets, but at least 9 carry a district column. Recommendation: tag every
+   dataset with its keys, such as council district, super neighborhood and ZIP code.
+3. **Keep yearly tables current.** The newest budget, FY2025, sits inside one
    dataset as "Budget 2025" and was last updated October 2024, so FY2026 and FY2027
-   are missing. Titles alone suggested 2013. Recommendation: publish update
-   schedules for featured datasets and keep yearly tables current.
-4. **GIS turns general answers into personal ones.** Address-level questions need
-   the City's boundary layers; the district record's 2024 date also shows why
-   update dates matter.
-5. **Discovery varies from run to run.** The agent picks its own search keywords,
-   so one run of the new-resident question missed the library inventory and the
-   next found it. A search for "park" matched only parking data. Recommendation:
-   give featured datasets clear titles and tags, such as "library locations" and
-   "parks," and score open-ended questions over several runs.
-6. **Metadata can contradict itself.** "Houston Libraries" carries a 2026 update
-   date but says "Updated Aug 2023" in its description. Recommendation: check that
-   descriptions and update dates agree when a dataset is refreshed.
-7. **The agent is honest about its memory.** The chat keeps only the text of earlier
-   answers, not their tool results. In a later turn the agent noticed it couldn't
-   show tool results behind earlier claims and labeled them unverified.
-   Recommendation: ask each evaluation question in a fresh chat, and consider
-   logging tool calls.
-8. **Thin tools push work onto the agent.** Before the redesign, totals meant
-   paging through hundreds of 100-row calls. Moving counting to the server made
-   question 7 a single call. Recommendation: design MCP tools around the question
-   being asked, not around the API's endpoints.
-9. **Schemas drift across years.** Payroll's Birth Year is a number in 2022–2023
-   and text from 2024, which breaks joins across years. Recommendation: keep column
-   types stable across yearly tables, as part of a machine-readable data standard.
-10. **Check the answer key, too.** The agent corrected two known answers. Build
-    known answers from the same depth of inspection the agent uses, and review any
-    disagreement before scoring it a failure.
+   are missing. Recommendation: publish update schedules for featured datasets.
+4. **Keep column types stable.** Payroll's Birth Year is a number in 2022–2023 and
+   text from 2024, which breaks joins across years. Recommendation: make stable
+   types part of a machine-readable data standard.
+5. **Make metadata agree with itself.** "Houston Libraries" carries a 2026 update
+   date but says "Updated Aug 2023" in its description, and the council district
+   layer is dated 2024. Recommendation: check descriptions and dates at each refresh.
+6. **Publish boundary layers next to the catalog.** ZIP codes cross district lines,
+   so address questions need the City's GIS layers. Recommendation: expose
+   authoritative boundary layers alongside open data.
+7. **Name datasets the way people ask.** One run of the new-resident question
+   missed the library inventory, and "park" matched only parking data.
+   Recommendation: give featured datasets clear titles and tags.
+
+### Improving the tools: design
+
+8. **Build tools around questions, not endpoints.** Before the redesign, totals
+   meant paging through hundreds of 100-row calls; summary mode made question 7 one
+   call. Recommendation: do multi-step work (newest table, counts by group) on the
+   server.
+9. **Good tools help limited agents most.** The capped app answered question 4
+   wrong with the old tools and right with the new ones; Claude Desktop, with no
+   caps, got it right both times.
+10. **Descriptions decide what the agent finds.** With the same code, the app missed
+    summary mode because its tool description was one line. Recommendation: write
+    descriptions around the question each mode answers, and keep one copy.
+
+### Improving the tools: deployment and testing
+
+11. **The client shapes the answer.** The same tools gave short, careful answers in
+    the app and longer, analytical ones in Claude Desktop. Recommendation: choose
+    the client and its limits for the audience.
+12. **Test through more than one client.** Testing only in the app would have hidden
+    the description gap; testing only in Claude Desktop would have hidden the effect
+    of the caps. Recommendation: evaluate an MCP server through at least two clients.
+13. **Restart and confirm before testing.** Claude Desktop kept running the old
+    server until it was restarted. Recommendation: check the client's tool list
+    before each evaluation round.
+14. **Test in fresh chats.** Claude Desktop sometimes drew on other chats, and the
+    app's chat keeps earlier answers. Recommendation: ask each evaluation question
+    in a new chat, and consider logging tool calls.
+15. **Check the answer key, too.** The agent corrected two known answers.
+    Recommendation: build known answers with the same depth the agent uses, and
+    review disagreements before scoring them as failures.
