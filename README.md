@@ -24,6 +24,23 @@ the portal can't answer; 30 live tool calls with 0 errors and a median of about
 0.2 seconds; all unit tests passing. The test also exposed metadata gaps worth fixing.
 See [eval/EVALUATION.md](eval/EVALUATION.md).
 
+## Design approach: built as an experiment
+
+The server is designed to answer a question, not only to serve data: *can AI
+actually use our open data, and where does it fail?*
+
+| Design idea | How the code delivers it |
+|---|---|
+| **A fair comparison.** One server, two versions, same AI, same questions, so the only difference is the data. | One setting, `USE_ARCGIS` in `config.py`, turns Ask Houston into Ask Houston+ |
+| **MCP as an AI-readiness test.** Comparing answers with and without MCP shows which datasets AI can't use, and why. | `scripts/run_eval.py` collects known answers from the live tools; [eval/EVALUATION.md](eval/EVALUATION.md) scores the agent against them |
+| **Questions that probe failure.** The test set includes data the portal doesn't have, so the agent must say so instead of guessing. | Question 5 (employee commute time); every tool returns an `error` with a fix-it `hint` |
+| **City data as the key to national data.** The City's own list of 118 ZIP codes turns National Weather Service and EPA AirNow data into Houston answers. | `src/houston_opendata/data/houston_zip_centroids.csv`, used by `conditions.py` |
+| **Tools shaped like the questions people ask.** | 8 tools built around questions; `houston_query_records` counts and totals on the server; `tool_docs.py` gives every client the same descriptions |
+| **Tested through two clients.** | The same 8 questions in Claude Desktop (over MCP) and the Streamlit app; both 8 of 8 |
+
+The evaluation found problems in three layers, data sources, tools and deployment,
+and each became a recommendation for the City's open data program.
+
 ## Tools
 
 Each tool answers a question a person or agent actually asks, rather than mirroring

@@ -7,6 +7,16 @@ tools were redesigned and every measurement repeated on November 15, 2026; all 8
 agent questions were asked that day in Claude Desktop, connected to the MCP server
 over stdio. Raw output: [results.md](results.md).
 
+## Design approach
+
+The evaluation is designed as an experiment. One server runs in two versions with
+the same AI and the same questions, so the only difference is the data each can
+reach: Ask Houston (the open data portal) and Ask Houston+ (adds City GIS layers,
+weather and air quality). The questions include one the portal can't answer, and
+the same questions were also asked with no MCP server and through two clients. The
+result is an AI-readiness test: it shows which datasets AI can use, which it
+can't, and why.
+
 ## Summary
 
 | Measure | Result |
