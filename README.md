@@ -22,7 +22,7 @@ specific to your address (Ask Houston+).
 **Evaluation (November 2026):** 8 known-answer questions, including one the portal
 can't answer, asked in two agent configurations. Each matched 7 and was partial on
 1 (question 3: the district-dataset count is a lower bound); the Streamlit app also
-made one error in supporting detail, recorded separately. 70 live tool calls with 0
+made one error in supporting detail, recorded separately. 80 live tool calls with 0
 errors; 81 of 81 unit tests passing (November 16, 2026). The test also exposed
 metadata gaps worth fixing.
 See [eval/EVALUATION.md](eval/EVALUATION.md).

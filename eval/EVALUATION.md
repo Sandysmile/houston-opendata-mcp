@@ -3,9 +3,10 @@
 Evaluation of Ask Houston (open data portal) and Ask Houston+ (adds City GIS
 address lookup, weather and air quality), run against the live City of Houston Open
 Data portal, City ArcGIS layers, the National Weather Service and EPA AirNow. The
-tools were redesigned and every measurement repeated on November 15, 2026; all 8
-agent questions were asked that day in Claude Desktop, connected to the MCP server
-over stdio. Raw output: [results.md](results.md).
+tools were redesigned on November 15, 2026, and all 8 agent questions were asked
+that day in Claude Desktop, connected to the MCP server over stdio. Known answers
+and response times were re-measured on November 16 after the fixes, and the unit
+tests were run the same day. Raw output: [results.md](results.md).
 
 ## Design approach
 
@@ -27,8 +28,8 @@ can't, and why.
 | Agent questions, Streamlit app chat (same tool functions, called directly, not over MCP) | 7 matched, 1 partial (question 3); missed summary mode on question 7 until descriptions were shared |
 | Errors in supporting detail | 1 (question 2, Streamlit app: counted 4 numeric pay columns; there are 5) |
 | Unit tests | 81 of 81 passing (`uv run pytest tests/`, November 16, 2026) |
-| Live tool calls | 70 across all 7 measured tools, with 0 errors |
-| Median tool response time | 0.15–0.58 seconds for the five uncached tools (live); summary mode not yet timed separately |
+| Live tool calls | 80 across 8 measured rows (10 each, November 16), with 0 errors |
+| Median tool response time | 0.15–0.70 seconds for the uncached tools (live); summary mode over all 26,220 payroll rows: 0.70 seconds |
 
 ## Data sources
 
@@ -167,7 +168,7 @@ questions people ask:
 | `houston_browse_catalog` replaces two list tools | One call shows departments and topics, ranked, paged past CKAN's 25-item cap |
 | `houston_get_dataset` lists columns and row counts for queryable tables, read in parallel, and picks the newest | "Most recent payroll" is answered without guessing; question 2 dropped from three calls to one |
 | `houston_describe_table` adds sample rows | The agent sees how values are written before using exact-match filters |
-| `houston_query_records` summary mode | Counts, sums and averages per group computed on the server over up to 100,000 rows; question 7 read all 26,220 rows in one tool call instead of 263 paged calls of 100 rows. Averages use only the numeric values, so missing pay values no longer pull them down |
+| `houston_query_records` summary mode | Counts, sums and averages per group computed on the server over up to 100,000 rows; question 7 read all 26,220 rows in one tool call (median 0.70 seconds over 10 live calls) instead of 263 paged calls of 100 rows. Averages use only the numeric values, so missing pay values no longer pull them down |
 | `houston_lookup_address` prefers an exact normalized match | When several City addresses fit and none matches exactly (such as units at one address), it returns the candidates and asks the agent to check with the user, instead of using the first row |
 | Pydantic input types in `models.py` for every tool | Shape and size are validated before any request; format problems still return a fix-it hint |
 
@@ -175,26 +176,25 @@ Ask Houston now has 5 tools and Ask Houston+ has 8.
 
 ## Performance
 
-Each tool was called 10 times from a local run on November 15, 2026, against the
-live services (seconds).
+Each tool was called 10 times from a local run on November 16, 2026, against the
+live services (seconds). Raw output: [results.md](results.md).
 
 | Tool | First call | Median | Slowest | Errors |
 |---|---|---|---|---|
-| houston_search_datasets | 0.18 | 0.19 | 0.34 | 0 |
-| houston_browse_catalog | 0.59 | 0.58 | 0.78 | 0 |
-| houston_get_dataset | 0.38 | 0.43 | 0.49 | 0 |
-| houston_query_records (records mode, 5 rows) | 0.13 | 0.15 | 0.18 | 0 |
-| houston_lookup_address | 0.27 | 0.20 | 0.27 | 0 |
-| houston_weather_forecast * | 0.28 | 0.00 | 0.28 | 0 |
-| houston_air_quality * | 0.27 | 0.00 | 0.27 | 0 |
+| houston_search_datasets | 0.17 | 0.18 | 0.26 | 0 |
+| houston_browse_catalog | 0.61 | 0.64 | 0.72 | 0 |
+| houston_get_dataset | 0.38 | 0.48 | 0.56 | 0 |
+| houston_query_records (records, 5 rows) | 0.14 | 0.15 | 0.17 | 0 |
+| houston_query_records (summary, all 26,220 payroll rows) | 0.77 | 0.70 | 0.79 | 0 |
+| houston_lookup_address | 0.19 | 0.20 | 0.24 | 0 |
+| houston_weather_forecast * | 0.24 | 0.00 | 0.24 | 0 |
+| houston_air_quality * | 0.20 | 0.00 | 0.20 | 0 |
 
 \* Weather and air quality responses are cached briefly on the server, so the
 first call measures the live National Weather Service and AirNow, and later calls
 measure the cache. `houston_browse_catalog` and `houston_get_dataset` are slower
-because each makes several portal requests in parallel.
-
-Summary mode was not timed in this run: the `houston_query_records` row is a
-5-row records query. `scripts/run_eval.py` now times summary mode on its own row.
+because each makes several portal requests in parallel. Summary mode is timed on
+its own row because it reads every matching row in pages of 10,000.
 
 Hosted response times add the hosting platform's network latency, and the first
 request after the hosted app has been idle can take longer while it wakes up.
