@@ -64,6 +64,18 @@ _ADDRESS_HINT = (
 _GIS_HINT = "The City GIS service may be busy. Try again shortly."
 
 
+def _canonical(text: Any) -> str:
+    """The City's address style for any text, without validating it.
+
+    Used for user input and for addresses read back from the City layer, so
+    both sides of an exact-match comparison are written the same way.
+    """
+    value = str(text or "").upper().split(",")[0].replace(".", "")
+    value = _NOT_ALLOWED.sub(" ", value)
+    value = _CITY_TAIL.sub("", " ".join(value.split()), count=1)
+    return " ".join(_SUFFIXES.get(word, word) for word in value.split())
+
+
 def normalize_address(text: str) -> str:
     """Turn user input into the City's address style, such as `901 BAGBY ST`.
 
@@ -71,11 +83,7 @@ def normalize_address(text: str) -> str:
     only letters, digits, spaces, and `# / -`, so it is safe inside a quoted
     LIKE pattern.
     """
-    value = (text or "").upper().split(",")[0].replace(".", "")
-    value = _NOT_ALLOWED.sub(" ", value)
-    value = _CITY_TAIL.sub("", " ".join(value.split()), count=1)
-    words = [_SUFFIXES.get(word, word) for word in value.split()]
-    value = " ".join(words)
+    value = _canonical(text)
     if not value or not value[0].isdigit() or not 3 <= len(value) <= 80:
         raise PortalError("That doesn't look like a street address.", _ADDRESS_HINT)
     return value
@@ -173,6 +181,41 @@ def _is_pending(attributes: dict[str, Any]) -> bool:
     )
 
 
+def _address_of(feature: dict[str, Any], field: str) -> Any:
+    return (feature.get("attributes") or {}).get(field)
+
+
+def _same_place(features: list[dict[str, Any]]) -> bool:
+    """True when every feature sits on the same point (duplicate records)."""
+    points = {
+        (round(p.get("x"), 6), round(p.get("y"), 6))
+        for f in features
+        if (p := f.get("geometry") or {}).get("x") is not None
+        and p.get("y") is not None
+    }
+    return len(points) <= 1
+
+
+def _choose_match(
+    matches: list[dict[str, Any]], field: str, street: str
+) -> tuple[dict[str, Any] | None, str, list[Any]]:
+    """Pick one address, or none when the choice belongs to the user.
+
+    The layer is searched by prefix, so `100 MAIN ST` also returns
+    `100 MAIN ST UNIT 2`. An exact normalized match wins; a single candidate is
+    used as is; otherwise the candidates go back to the caller to choose from,
+    instead of silently taking the first row the service returned.
+    """
+    shown = matches[:MAX_MATCHES]
+    candidates = list(dict.fromkeys(_address_of(m, field) for m in shown))
+    exact = [m for m in shown if _canonical(_address_of(m, field)) == street]
+    if exact and _same_place(exact):
+        return exact[0], "exact", candidates
+    if not exact and len(shown) == 1:
+        return shown[0], "only_candidate", candidates
+    return None, "ambiguous", candidates
+
+
 async def lookup_address(address: str) -> dict[str, Any]:
     """Find a Houston address, then the city limits, council district, and super
     neighborhood that contain it."""
@@ -185,7 +228,8 @@ async def lookup_address(address: str) -> dict[str, Any]:
             "outFields": "*",
             "returnGeometry": "true",
             "outSR": 4326,
-            "resultRecordCount": MAX_MATCHES,
+            # One extra row shows whether there were more than MAX_MATCHES.
+            "resultRecordCount": MAX_MATCHES + 1,
         },
     )
     sources = [
@@ -200,7 +244,21 @@ async def lookup_address(address: str) -> dict[str, Any]:
             "sources": sources[:1],
         }
 
-    best = matches[0]
+    best, match_type, candidates = _choose_match(matches, field, street)
+    if best is None:
+        return {
+            "found": False,
+            "ambiguous": True,
+            "searched_for": street,
+            "candidates": candidates,
+            "more_candidates": len(matches) > MAX_MATCHES,
+            "hint": "Several City addresses start with this one and none matches "
+            "it exactly. Ask the user which address they mean (for example the "
+            "unit or the full street name), then look it up again. Do not pick "
+            "one yourself.",
+            "sources": sources[:1],
+        }
+
     point = best.get("geometry") or {}
     x, y = point.get("x"), point.get("y")
     if x is None or y is None:
@@ -216,8 +274,9 @@ async def lookup_address(address: str) -> dict[str, Any]:
         "found": True,
         "searched_for": street,
         "matched_address": (best.get("attributes") or {}).get(field),
+        "match_type": match_type,
         "address_record": _clean(best.get("attributes") or {}),
-        "other_matches": [(m.get("attributes") or {}).get(field) for m in matches[1:]],
+        "other_matches": [c for c in candidates if c != _address_of(best, field)],
         "location": {"longitude": x, "latitude": y},
         "inside_city_limits": inside,
         "city_limits": limits,

@@ -103,6 +103,68 @@ async def test_unknown_address_returns_a_hint(arcgis):
     assert "hint" in result
 
 
+def _addresses(*rows):
+    """Address-layer features: (address, x, y) tuples."""
+    return {
+        "features": [
+            {"attributes": {"FULLADDRESS": a}, "geometry": {"x": x, "y": y}}
+            for a, x, y in rows
+        ]
+    }
+
+
+async def test_exact_match_wins_over_longer_prefix_matches(arcgis):
+    _, responses = arcgis
+    # The service returns the unit first; the exact address must still win.
+    responses[f"{gis.ADDRESS_LAYER}/query"] = _addresses(
+        ("100 MAIN ST UNIT 2", -95.1, 29.1),
+        ("100 MAIN ST", -95.2, 29.2),
+    )
+    result = await gis.lookup_address("100 Main Street, Houston, TX 77002")
+    assert result["found"] is True
+    assert result["match_type"] == "exact"
+    assert result["matched_address"] == "100 MAIN ST"
+    assert result["location"] == {"longitude": -95.2, "latitude": 29.2}
+    assert result["other_matches"] == ["100 MAIN ST UNIT 2"]
+
+
+async def test_ambiguous_address_returns_choices_instead_of_guessing(arcgis):
+    calls, responses = arcgis
+    responses[f"{gis.ADDRESS_LAYER}/query"] = _addresses(
+        ("100 MAIN ST UNIT 1", -95.1, 29.1),
+        ("100 MAIN ST UNIT 2", -95.2, 29.2),
+    )
+    result = await gis.lookup_address("100 Main St")
+    assert result["found"] is False
+    assert result["ambiguous"] is True
+    assert result["candidates"] == ["100 MAIN ST UNIT 1", "100 MAIN ST UNIT 2"]
+    assert "Ask the user" in result["hint"]
+    assert "council_district" not in result
+    # No boundary layer was queried for a guessed point.
+    assert [c[0] for c in calls] == [gis.ADDRESS_LAYER, f"{gis.ADDRESS_LAYER}/query"]
+
+
+async def test_single_prefix_candidate_is_used(arcgis):
+    _, responses = arcgis
+    responses[f"{gis.ADDRESS_LAYER}/query"] = _addresses(
+        ("901 BAGBY ST STE 100", -95.369, 29.760)
+    )
+    result = await gis.lookup_address("901 Bagby St")
+    assert result["found"] is True
+    assert result["match_type"] == "only_candidate"
+    assert result["other_matches"] == []
+
+
+async def test_nonexistent_address_is_not_found(arcgis):
+    calls, responses = arcgis
+    responses[f"{gis.ADDRESS_LAYER}/query"] = {"features": []}
+    result = await gis.lookup_address("99999 Nowhere Ln")
+    assert result["found"] is False
+    assert "ambiguous" not in result
+    assert result["searched_for"] == "99999 NOWHERE LN"
+    assert len(calls) == 2  # field list and address search only
+
+
 def test_address_tool_only_in_ask_houston_plus():
     names = {t["name"] for t in agent.tools(use_arcgis=False)}
     assert "houston_lookup_address" not in names

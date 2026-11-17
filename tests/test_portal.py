@@ -259,6 +259,44 @@ async def test_summary_counts_sums_and_averages_by_group(ckan):
     assert json.loads(params["filters"]) == {"YEAR": "2026"}
 
 
+async def test_summary_averages_only_numeric_values_across_pages(ckan, monkeypatch):
+    calls, _ = ckan
+    monkeypatch.setattr(portal, "SUMMARY_PAGE_SIZE", 2)
+    rows = [
+        {"DEPT": "A", "PAY": 100},
+        {"DEPT": "A", "PAY": None},
+        {"DEPT": "A", "PAY": "n/a"},
+        {"DEPT": "A", "PAY": 0},
+        {"DEPT": "B", "PAY": "$300.00"},
+        {"DEPT": "B", "PAY": ""},
+    ]
+    portal.fetch_json = _paged_rows(calls, rows)
+    data = await call(
+        "houston_query_records",
+        {"resource_id": RESOURCE_ID, "summary": {"count_by": "DEPT", "sum_of": "PAY"}},
+    )
+    assert data["groups"] == [
+        {"value": "A", "count": 4, "sum": 100.0, "average": 50.0},
+        {"value": "B", "count": 2, "sum": 300.0, "average": 300.0},
+    ]
+    assert data["values_not_numeric"] == 3
+    assert data["complete"] is True
+
+
+async def test_summary_average_is_null_without_numeric_values(ckan):
+    calls, _ = ckan
+    portal.fetch_json = _paged_rows(
+        calls,
+        [{"DEPT": "A", "PAY": None}, {"DEPT": "A", "PAY": "n/a"}],
+    )
+    data = await call(
+        "houston_query_records",
+        {"resource_id": RESOURCE_ID, "summary": {"count_by": "DEPT", "sum_of": "PAY"}},
+    )
+    assert data["groups"] == [{"value": "A", "count": 2, "sum": 0.0, "average": None}]
+    assert data["values_not_numeric"] == 2
+
+
 async def test_summary_pages_and_stops_at_the_cap(ckan, monkeypatch):
     calls, _ = ckan
     monkeypatch.setattr(portal, "SUMMARY_PAGE_SIZE", 2)

@@ -81,7 +81,7 @@ def years_in(text: str) -> list[int]:
 
 async def known_answers(
     client: Client,
-) -> tuple[list[str], str | None, str | None]:
+) -> tuple[list[str], str | None, str | None, str | None]:
     lines: list[str] = []
     payroll_resource = None
     payroll_columns: list[str] = []
@@ -242,13 +242,15 @@ async def known_answers(
         f"| 8 (Ask Houston+) | Is it a good time to be outside in {TEST_ZIP}? | "
         f"{answer} |"
     )
-    return lines, payroll_resource, payroll_name
+    return lines, payroll_resource, payroll_name, department
 
 
 async def main() -> None:
     async with Client(mcp) as client:
         print("Collecting known answers...")
-        answers, payroll_resource, payroll_name = await known_answers(client)
+        answers, payroll_resource, payroll_name, department = await known_answers(
+            client
+        )
 
         print(f"Timing tools ({RUNS} calls each)...")
         perf = [
@@ -265,14 +267,26 @@ async def main() -> None:
                 2, await timed(client, "houston_get_dataset", {"dataset": payroll_name})
             )
         if payroll_resource:
-            perf.insert(
-                3,
-                await timed(
-                    client,
-                    "houston_query_records",
-                    {"resource_id": payroll_resource, "pagination": {"limit": 5}},
-                ),
+            records = await timed(
+                client,
+                "houston_query_records",
+                {"resource_id": payroll_resource, "pagination": {"limit": 5}},
             )
+            records["tool"] += " (records, 5 rows)"
+            perf.insert(3, records)
+        if payroll_resource and department:
+            # Summary mode reads every matching row in pages, so it is timed on
+            # its own rather than inferred from the 5-row records call above.
+            summary = await timed(
+                client,
+                "houston_query_records",
+                {
+                    "resource_id": payroll_resource,
+                    "summary": {"count_by": department, "top": 3},
+                },
+            )
+            summary["tool"] += " (summary, all payroll rows)"
+            perf.insert(4, summary)
 
     rows = [
         f"| {p['tool']} | {p['first']:.2f} | {p['median']:.2f} | {p['max']:.2f} | "

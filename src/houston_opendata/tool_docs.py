@@ -53,7 +53,11 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "checks the point against three City boundary layers in parallel, so one\n"
         "call replaces five GIS queries. Uses City of Houston GIS layers on ArcGIS\n"
         "Online. Use this whenever a\n"
-        "question gives a street address; a ZIP code alone can cross district lines."
+        "question gives a street address; a ZIP code alone can cross district lines.\n"
+        "\n"
+        "An exact match wins. If several City addresses fit and none matches\n"
+        "exactly, it returns ambiguous=true with the candidates: ask the user which\n"
+        "one they mean instead of choosing."
     ),
     "houston_query_records": (
         "Answer questions about a table's records, in one of two modes.\n"

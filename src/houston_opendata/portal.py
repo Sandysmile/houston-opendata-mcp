@@ -373,7 +373,9 @@ async def summarize_records(
         for row in records:
             key = row.get(count_by)
             key = "(blank)" if key in (None, "") else str(key).strip()
-            group = groups.setdefault(key, {"value": key, "count": 0, "sum": 0.0})
+            group = groups.setdefault(
+                key, {"value": key, "count": 0, "sum": 0.0, "numeric_count": 0}
+            )
             group["count"] += 1
             if sum_of:
                 number = _number(row.get(sum_of))
@@ -381,6 +383,7 @@ async def summarize_records(
                     unparsed += 1
                 else:
                     group["sum"] += number
+                    group["numeric_count"] += 1
         scanned += len(records)
         if not records or scanned >= total:
             break
@@ -391,7 +394,12 @@ async def summarize_records(
         entry: dict[str, Any] = {"value": group["value"], "count": group["count"]}
         if sum_of:
             entry["sum"] = round(group["sum"], 2)
-            entry["average"] = round(group["sum"] / group["count"], 2)
+            # Missing values still count as records, but not as numeric samples.
+            entry["average"] = (
+                round(group["sum"] / group["numeric_count"], 2)
+                if group["numeric_count"]
+                else None
+            )
         shown.append(entry)
 
     complete = scanned >= total

@@ -19,9 +19,12 @@ use Houston's open data to answer them. With the same AI and the same question, 
 answer goes from generic (no MCP), to grounded in City datasets (Ask Houston), to
 specific to your address (Ask Houston+).
 
-**Evaluation (November 2026):** 6 of 6 known-answer questions correct, including one
-the portal can't answer; 30 live tool calls with 0 errors and a median of about
-0.2 seconds; all unit tests passing. The test also exposed metadata gaps worth fixing.
+**Evaluation (November 2026):** 8 known-answer questions, including one the portal
+can't answer, asked in two agent configurations. Each matched 7 and was partial on
+1 (question 3: the district-dataset count is a lower bound); the Streamlit app also
+made one error in supporting detail, recorded separately. 70 live tool calls with 0
+errors; 81 of 81 unit tests passing (November 16, 2026). The test also exposed
+metadata gaps worth fixing.
 See [eval/EVALUATION.md](eval/EVALUATION.md).
 
 ## Works with any MCP client
@@ -42,7 +45,7 @@ actually use our open data, and where does it fail?*
 | **Questions that probe failure.** The test set includes data the portal doesn't have, so the agent must say so instead of guessing. | Question 5 (employee commute time); every tool returns an `error` with a fix-it `hint` |
 | **City data as the key to national data.** The City's own list of 118 ZIP codes turns National Weather Service and EPA AirNow data into Houston answers. | `src/houston_opendata/data/houston_zip_centroids.csv`, used by `conditions.py` |
 | **Tools shaped like the questions people ask.** | 8 tools built around questions; `houston_query_records` counts and totals on the server; `tool_docs.py` gives every client the same descriptions |
-| **Tested through two clients.** | The same 8 questions in Claude Desktop (over MCP) and the Streamlit app; both 8 of 8 |
+| **Tested in two agent configurations.** | The same 8 questions in Claude Desktop (an MCP client, over stdio) and the Streamlit app's chat agent (the same tool functions, called directly); 7 matched and 1 partial in each |
 
 The evaluation found problems in three layers, data sources, tools and deployment,
 and each became a recommendation for the City's open data program.
@@ -67,7 +70,7 @@ With `USE_ARCGIS=true`, the server adds three more tools:
 
 | Tool | Question it answers |
 |---|---|
-| `houston_lookup_address` | Who represents me, and what neighborhood am I in? Matches the address to City address points, then checks city limits, council district and super neighborhood layers in parallel: one call instead of five GIS queries |
+| `houston_lookup_address` | Who represents me, and what neighborhood am I in? Matches the address to City address points, then checks city limits, council district and super neighborhood layers in parallel: one call instead of five GIS queries. An exact match wins; if several addresses fit, it returns the choices to ask the user about |
 | `houston_weather_forecast` | Should I plan around the weather? NWS forecast plus active alerts (such as flood warnings), joined to the City's own ZIP list (no key needed) |
 | `houston_air_quality` | Is the air healthy right now? EPA AirNow current reading and forecast, joined to the City's ZIP list (needs `AIRNOW_API_KEY`) |
 
