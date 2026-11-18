@@ -133,28 +133,29 @@ careful answer, and Claude Desktop for analysts and data stewards.
 
 ## Comparison question: a new resident
 
-An open-ended question with no single right answer, asked three ways to show how
-the data source changes the answer: "I just moved to 611 Walker St. What City
-resources can I connect with?"
+An open-ended question with no single right answer, asked three ways on November 15
+to show how the data source changes the answer: "I just moved to 611 Walker St. Who
+represents me, and what City services can I use?" Each run was a fresh Claude Desktop
+chat with memory off, and the MCP runs were limited to the MCP data tools.
 
 Known facts from the City GIS layers: inside city limits; Council District I
 (Joaquin Martinez, record dated 2024); Downtown, super neighborhood 61.
 
 | Version | What the answer included | Specific to the address? | Sources cited? |
 |---|---|---|---|
-| Claude with no MCP server | General City resources: 311, HoustonTX.gov, how to look up a council member, the library, AlertHouston | No | Web pages only |
-| Ask Houston | Said it can't look up an address. Pointed to the council district, super neighborhood and jurisdiction datasets; found the Central Library at 500 McKinney St in the library inventory; noted no trash schedule dataset | Partly: nearby library, but no district | Yes, portal links with update dates |
-| Ask Houston+ | Inside city limits with full service; District I, Joaquin Martinez and phone, record dated 2024; Downtown super neighborhood profile; recycling facilities and food inspection datasets; no trash schedule | Yes | Yes, portal links with update dates |
+| Claude with no MCP server | Asked which city first. Once told Houston, searched the web and said "most likely District I," citing news and web pages to check | No | Web pages only |
+| Ask Houston | Used the City's jurisdiction table: ZIP 77002 spans four council districts (H 45%, I 36%, D 14%, C 5%), so it said it could not place the address | No, but honest about why | Yes, City datasets |
+| Ask Houston+ | One tool call checked four City GIS layers: inside city limits, District I and its council member, the Downtown super neighborhood, and the City services the address receives | Yes | Yes, City GIS layers and datasets |
 
 Result: only Ask Houston+ placed the resident in a council district and super
-neighborhood. Both MCP versions cited their sources and stated what they couldn't
+neighborhood. Both MCP versions cited only City sources and said what they could not
 find, instead of guessing.
 
-A second Ask Houston+ run of the same question searched more keywords and this time
-found the library inventory and a 311 knowledge base dataset. The first run had
-reported no library listing. It also surfaced two new findings: the "Houston
-Libraries" dataset shows an update date of 2026-11-03 while its description says
-"Updated Aug 2023," and a search for "park" returned only parking datasets.
+Earlier runs of the question, worded "What City resources can I connect with?",
+surfaced three metadata findings: one run missed the library inventory that another
+found, the "Houston Libraries" dataset shows an update date of 2026-11-03 while its
+description says "Updated Aug 2023," and a search for "park" returned only parking
+datasets.
 
 ## Tool design: built around user goals
 
