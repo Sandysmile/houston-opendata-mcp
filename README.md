@@ -52,6 +52,53 @@ and each became a recommendation for the City's open data program.
 
 **Data sources, MCP design and deployment all matter.** The data sources decide what the AI can know; the design of the tools and the choice of deployment decide how well it uses that data.
 
+## Architecture
+
+```mermaid
+flowchart TD
+    subgraph IN["Ways in"]
+        CD["Claude Desktop<br/>MCP client, stdio"]
+        ANY["Any MCP client<br/>HTTP at /api/mcp"]
+        ST["Streamlit app<br/>calls tools directly"]
+    end
+
+    subgraph SRV["Ask Houston MCP server (FastMCP, app.py)"]
+        T["8 tools<br/>5 + 3 in Ask Houston+ (USE_ARCGIS)"]
+        PR["2 prompts, 2 resources"]
+        PY["Pydantic inputs (models.py)<br/>shared descriptions (tool_docs.py)"]
+    end
+
+    subgraph CON["Read-only connectors"]
+        P["portal.py<br/>allow-listed CKAN read actions"]
+        G["gis.py<br/>4 fixed City GIS layers"]
+        C["conditions.py<br/>NWS + AirNow via 118 City ZIP codes"]
+    end
+
+    GR["Guardrails (utils.py): fixed origins, no redirects,<br/>5 MB response cap, sanitized errors"]
+
+    subgraph SRC["Public data sources"]
+        OD["City of Houston Open Data Portal<br/>data.houstontx.gov"]
+        GIS["City GIS layers<br/>ArcGIS Online"]
+        NWS["National Weather Service"]
+        AQ["EPA AirNow"]
+    end
+
+    CD --> SRV
+    ANY --> SRV
+    ST -. "direct function calls, not MCP" .-> SRV
+    SRV --> P & G & C
+    P & G & C --> GR
+    GR --> OD & GIS & NWS & AQ
+```
+
+Each layer has one job, so it can be read and tested on its own:
+
+- **Ways in.** Claude Desktop connects over stdio; any other MCP client can connect over stateless HTTP at `/api/mcp`. The Streamlit app calls the same tool functions directly, which is why the evaluation compares two agent configurations rather than two MCP clients.
+- **Server.** Tools are built around the questions people ask, not one per API endpoint. Every input is a validated Pydantic model, and both ways in read one shared set of tool descriptions.
+- **Connectors.** Each upstream service has one read-only client. Upstream addresses are fixed in code, so no tool accepts a URL from the caller.
+- **Guardrails.** All requests share the same limits, and errors return a fix-it `hint` instead of raw upstream output.
+- **Data.** Everything is public. The server stores no user data and has no write actions.
+
 ## Tools
 
 Each tool answers a question a person or agent actually asks, rather than mirroring
